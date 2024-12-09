@@ -1,6 +1,3 @@
-
-  # Required files are given in meta data as requires and dependencies. So no need to install each time in pip command
-
 # /// script
 # requires-python = ">=3.11"
 # requires-openai=">=0.27.0"
@@ -36,8 +33,7 @@ from sklearn.preprocessing import StandardScaler
 from io import BytesIO
 from PIL import Image
 
-# Set the AIPROXY TOKEN and URL
-
+# Set the AIPROXY TOKEN
 AIPROXY_TOKEN='eyJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6IjIzZjIwMDE2OTZAZHMuc3R1ZHkuaWl0bS5hYy5pbiJ9.RI1VedMQmvVJGVO63TULkf-w86U0U7kWg_qd9baBxMU'
 API_URL = "https://aiproxy.sanand.workers.dev/openai/v1/chat/completions"
 
@@ -49,35 +45,32 @@ if not AIPROXY_TOKEN:
 def load_data(file_path):
     try:
         with open(file_path, 'rb') as f:
-            result = chardet.detect(f.read())  # # Detect the encoding of a file that may have different or unknown character encodings from different sources or systems.
-        encoding = result['encoding']   # which encoding among these('utf-8', 'ISO-8859-1','Windows-1252')
-        data = pd.read_csv(file_path, encoding=encoding)   # prevent issues where characters from different languages or symbols may appear as garbage or unreadable text when reading the CSV file
+            result = chardet.detect(f.read())  # Detect encoding
+        encoding = result['encoding']
+        data = pd.read_csv(file_path, encoding=encoding)
         return data
     except Exception as e:
         print(f"Error loading file {file_path}: {e}")
         sys.exit(1)
 
 # Perform basic analysis like summary stats, missing values, etc.
-
 def basic_analysis(data):
-    summary = data.describe(include='all').to_dict()   # compute summary statistics (like count, mean, standard deviation, min, max, etc.) for numerical columns.
+    summary = data.describe(include='all').to_dict()  # Summary statistics
     missing_values = data.isnull().sum().to_dict()  # Missing values
     column_info = data.dtypes.to_dict()  # Column types
     return {"summary": summary, "missing_values": missing_values, "column_info": column_info}
 
 # Robust outlier detection using IQR (Interquartile Range)
-
 def outlier_detection(data):
-    numeric_data = data.select_dtypes(include=np.number)  # returns columns with numeric data
+    numeric_data = data.select_dtypes(include=np.number)
     Q1 = numeric_data.quantile(0.25)
     Q3 = numeric_data.quantile(0.75)
-    IQR = Q3 - Q1           #Outliers is for identifying extreme values in your dataset that could be errors or just rare events.
+    IQR = Q3 - Q1
     outliers = ((numeric_data < (Q1 - 1.5 * IQR)) | (numeric_data > (Q3 + 1.5 * IQR))).sum().to_dict()
     return {"outliers": outliers}
 
 # Correlation Matrix
-
-def generate_correlation_matrix(data, output_dir):   # To find relationships between multiple variables
+def generate_correlation_matrix(data, output_dir):
     data = data.select_dtypes(include=[np.number])
     corr = data.corr()
     plt.figure(figsize=(10, 8))
@@ -88,10 +81,8 @@ def generate_correlation_matrix(data, output_dir):   # To find relationships bet
     plt.close()
     return corr_path
 
-    
 # DBSCAN clustering (Density-Based Clustering)
-
-def dbscan_clustering(data, output_dir):    # Identifying regions of high density
+def dbscan_clustering(data, output_dir):
     numeric_data = data.select_dtypes(include=np.number).dropna()
     scaler = StandardScaler()
     scaled_data = scaler.fit_transform(numeric_data)
@@ -107,10 +98,8 @@ def dbscan_clustering(data, output_dir):    # Identifying regions of high densit
     plt.close()
     return dbscan_path
 
-'''# Hierarchical Clustering
-
-def hierarchical_clustering(data, output_dir):      #group similar data points together
-    
+# Hierarchical Clustering
+def hierarchical_clustering(data, output_dir):
     numeric_data = data.select_dtypes(include=np.number).dropna()
     linked = linkage(numeric_data, 'ward')
     plt.figure(figsize=(10, 7))
@@ -121,10 +110,9 @@ def hierarchical_clustering(data, output_dir):      #group similar data points t
     print("hierarchical_clustering.png created")
     plt.close()
     return hc_path
-'''
-# Function to convert image to Base64
 
-def image_to_base64(image_path, save_path):    # ensure the integrity of binary data during transmission,
+# Function to convert image to Base64
+def image_to_base64(image_path, save_path):
     with Image.open(image_path) as img:
         target_width = 800
         width, height = img.size
@@ -153,11 +141,10 @@ def image_to_base64(image_path, save_path):    # ensure the integrity of binary 
         
     return img_base64  # Return Base64-encoded image
 
-
 # Function to send the data info to the LLM and request analysis or code
-
 def query_llm_for_analysis(prompt):
-   
+    
+    
 
     # Prepare the prompt to query the LLM
     
@@ -195,15 +182,12 @@ def query_llm_for_analysis(prompt):
     sys.exit(1)  # Exit after retries have failed
 
 # Save results in a Markdown README
-
 def save_readme(content, output_dir):
     with open(os.path.join(output_dir, "README.md"), "w") as f:
         f.write(content)
         print("Readme saved")
 
-
 # Function to analyze and generate output for each file
-
 def analyze_and_generate_output(file_path):
     base_name = os.path.splitext(os.path.basename(file_path))[0]
     output_dir = os.path.join(".", base_name)
@@ -222,6 +206,7 @@ def analyze_and_generate_output(file_path):
     image_paths = {}
     image_paths['correlation_matrix'] = generate_correlation_matrix(data, output_dir)
     image_paths['dbscan_clusters'] = dbscan_clustering(data, output_dir)
+    image_paths['hierarchical_clustering'] = hierarchical_clustering(data, output_dir)
     print("Images created:\n", image_paths)
 
     
@@ -243,23 +228,22 @@ def analyze_and_generate_output(file_path):
     }
     
     prompt = (
-        "You are a creative interesting storyteller. "
+        "You are a creative storyteller. "
         "Craft a compelling narrative based on this dataset analysis:\n\n"
-        f"Filename: {data_info['filename']}\n\n",
         f"Data Summary: {data_info['summary']}\n\n"
         f"Missing Values: {data_info['missing_values']}\n\n"
         f"Outlier Analysis: {data_info['outliers']}\n\n"
         "Create a narrative covering these points:\n"
-        f"Correlation matrix:{filenames[0]},\n"
         f"DBSCAN Clusters: {filenames[1]},\n"
-            )
+        f"Hierarchical Clustering: {filenames[2]}\n"
+    )
     narrative = query_llm_for_analysis(prompt)
-   
+    print(f"\nLLM Narrative:\n{narrative}")
 
     # Save the narrative to a README file
     save_readme(narrative, output_dir)
 
-def resize_image(input_path, output_path, size=(300, 300)):   # reduce the size of the images 
+def resize_image(input_path, output_path, size=(300, 300)):
     """Resize an image to the specified size."""
     with Image.open(input_path) as img:
         img = img.resize(size)
@@ -272,7 +256,7 @@ def image_to_base64(image_path):
         return base64.b64encode(image_file.read()).decode('utf-8')
 
 def process_images(image_paths, output_dir, resize_size=(300, 300)):
-    """Resize images, convert to Base64"""
+    """Resize images, convert to Base64, and store filenames for LLM analysis."""
     images_base64 = {}
     filenames = []
 
@@ -289,6 +273,7 @@ def process_images(image_paths, output_dir, resize_size=(300, 300)):
         filenames.append(resized_image_path)
     
     return images_base64, filenames
+
 
 
 

@@ -34,7 +34,10 @@ from io import BytesIO
 from PIL import Image
 
 # Set the AIPROXY TOKEN
-AIPROXY_TOKEN='eyJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6IjIzZjIwMDE2OTZAZHMuc3R1ZHkuaWl0bS5hYy5pbiJ9.RI1VedMQmvVJGVO63TULkf-w86U0U7kWg_qd9baBxMU'
+api_key = os.getenv("AIPROXY_TOKEN")
+
+AIPROXY_TOKEN= api_key
+
 API_URL = "https://aiproxy.sanand.workers.dev/openai/v1/chat/completions"
 
 if not AIPROXY_TOKEN:

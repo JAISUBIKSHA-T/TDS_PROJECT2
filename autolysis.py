@@ -1,3 +1,5 @@
+# Required files are given in meta data as requires and dependencies. So no need to install each time in pip command
+
 # /// script
 # requires-python = ">=3.11"
 # requires-openai=">=0.27.0"
@@ -48,36 +50,41 @@ if not AIPROXY_TOKEN:
 def load_data(file_path):
     try:
         with open(file_path, 'rb') as f:
-            result = chardet.detect(f.read())  # Detect encoding
-        encoding = result['encoding']
-        data = pd.read_csv(file_path, encoding=encoding)
+            result = chardet.detect(f.read())  # Detect the encoding of a file that may have different or unknown character encodings from different sources or systems.
+        encoding = result['encoding']   # which encoding among these('utf-8', 'ISO-8859-1','Windows-1252')
+        data = pd.read_csv(file_path, encoding=encoding)   # prevent issues where characters from different languages or symbols may appear as garbage or unreadable text when reading the CSV file
         return data
     except Exception as e:
         print(f"Error loading file {file_path}: {e}")
         sys.exit(1)
 
 # Perform basic analysis like summary stats, missing values, etc.
+
 def basic_analysis(data):
     summary = data.describe(include='all').to_dict()  # Summary statistics
     missing_values = data.isnull().sum().to_dict()  # Missing values
     column_info = data.dtypes.to_dict()  # Column types
     return {"summary": summary, "missing_values": missing_values, "column_info": column_info}
 
-# Robust outlier detection using IQR (Interquartile Range)
+ #Robust outlier detection using IQR (Interquartile Range)        #Outliers - to identify extreme values in your dataset that could be errors or just rare events.
+
 def outlier_detection(data):
     numeric_data = data.select_dtypes(include=np.number)
     Q1 = numeric_data.quantile(0.25)
     Q3 = numeric_data.quantile(0.75)
-    IQR = Q3 - Q1
+    IQR = Q3 - Q1              
     outliers = ((numeric_data < (Q1 - 1.5 * IQR)) | (numeric_data > (Q3 + 1.5 * IQR))).sum().to_dict()
     return {"outliers": outliers}
 
 # Correlation Matrix
-def generate_correlation_matrix(data, output_dir):
+
+def generate_correlation_matrix(data, output_dir):   # To find relationships between multiple variables
     data = data.select_dtypes(include=[np.number])
     corr = data.corr()
     plt.figure(figsize=(10, 8))
     sns.heatmap(corr, annot=True, cmap="coolwarm")
+    plt.xlabel(data.columns[0], fontsize=12)
+    plt.ylabel(data.columns[1], fontsize=12)
     plt.title("Correlation Matrix")
     corr_path = os.path.join(output_dir, "correlation_matrix.png")
     plt.savefig(corr_path)
@@ -94,6 +101,8 @@ def dbscan_clustering(data, output_dir):
     numeric_data['cluster'] = clusters
     plt.figure(figsize=(8, 6))
     sns.scatterplot(x=numeric_data.iloc[:, 0], y=numeric_data.iloc[:, 1], hue=numeric_data['cluster'], palette="viridis")
+    plt.xlabel(numeric_data.columns[0], fontsize=12)
+    plt.ylabel(numeric_data.columns[1], fontsize=12)    
     plt.title("DBSCAN Clustering")
     dbscan_path = os.path.join(output_dir, "dbscan_clusters.png")
     plt.savefig(dbscan_path)
@@ -108,14 +117,16 @@ def hierarchical_clustering(data, output_dir):
     plt.figure(figsize=(10, 7))
     dendrogram(linked)
     plt.title("Hierarchical Clustering Dendrogram")
+    plt.xlabel(numeric_data.columns[0], fontsize=12)
+    plt.ylabel(numeric_data.columns[1], fontsize=12)
     hc_path = os.path.join(output_dir, "hierarchical_clustering.png")
     plt.savefig(hc_path)
     print("hierarchical_clustering.png created")
     plt.close()
     return hc_path
 
-# Function to convert image to Base64
-def image_to_base64(image_path, save_path):
+# Function to convert image to Base64  
+def image_to_base64(image_path, save_path):   #ensure the integrity of binary data during transmission
     with Image.open(image_path) as img:
         target_width = 800
         width, height = img.size
@@ -123,14 +134,14 @@ def image_to_base64(image_path, save_path):
         target_height = int(target_width * aspect_ratio)  # Maintain aspect ratio
 
         # Resize the image using LANCZOS filter
-        resized_img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
+        resized_img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)    # compress image before send to prompt
 
         # Ensure the directory exists before saving the image
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         print("Save path created")
 
         # Save the resized image to the given file path
-        resized_img.save(save_path, format="PNG")  # Save the image as PNG (or adjust format if needed)
+        resized_img.save(save_path, format="PNG")   # Save the image as PNG (or adjust format if needed)
         print("Saved")
 
         # Save the resized image to a BytesIO object (in-memory binary stream)
@@ -153,7 +164,7 @@ def query_llm_for_analysis(prompt):
     
     headers = {"Authorization": f"Bearer {AIPROXY_TOKEN}"}
     payload = {
-        "model": "gpt-4o-mini",  # or use the correct model
+        "model": "gpt-4o-mini", 
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": 1500,
         "temperature": 0.7
@@ -276,8 +287,6 @@ def process_images(image_paths, output_dir, resize_size=(300, 300)):
         filenames.append(resized_image_path)
     
     return images_base64, filenames
-
-
 
 
 # Main execution function

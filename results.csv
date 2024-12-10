@@ -1,0 +1,13 @@
+marks,total,test,reason,id
+1.0,1.0,mit_license,present,JAISUBIKSHA-T-TDS_PROJECT2
+0.4,0.4,autolysis.py,present,JAISUBIKSHA-T-TDS_PROJECT2
+0.1,0.1,goodreads/README.md,present,JAISUBIKSHA-T-TDS_PROJECT2
+0.1,0.1,goodreads/*.png,present,JAISUBIKSHA-T-TDS_PROJECT2
+0.1,0.1,happiness/README.md,present,JAISUBIKSHA-T-TDS_PROJECT2
+0.1,0.1,happiness/*.png,present,JAISUBIKSHA-T-TDS_PROJECT2
+0.1,0.1,media/README.md,present,JAISUBIKSHA-T-TDS_PROJECT2
+0.1,0.1,media/*.png,present,JAISUBIKSHA-T-TDS_PROJECT2
+0.5,0.5,uv run autolysis goodreads.csv,ran,JAISUBIKSHA-T-TDS_PROJECT2
+0.5,0.5,uv run autolysis happiness.csv,ran,JAISUBIKSHA-T-TDS_PROJECT2
+0.5,0.5,uv run autolysis media.csv,ran,JAISUBIKSHA-T-TDS_PROJECT2
+0.5,0.5,uv run autolysis *,ran,JAISUBIKSHA-T-TDS_PROJECT2

@@ -115,6 +115,13 @@ def dbscan_clustering(data, output_dir):
 
 
 
+def validate_data(data):
+    if data.empty:
+        raise ValueError("The input data is empty. Please check the file or input source.")
+    if data.shape[1] < 2:
+        raise ValueError("The input data must have at least two columns for visualization.")
+
+
 def gen_stat_visual(data, output_dir, visualization_type):
     """
     Generate a statistical visualization using an API-generated code and save it as a PNG.
@@ -132,6 +139,7 @@ def gen_stat_visual(data, output_dir, visualization_type):
     """
     # Filter numeric columns and drop NaN values
     data1 = data.select_dtypes(include=np.number).dropna()
+    data1=vaildate_dta(data1)
 
     # Ensure the output directory exists
     os.makedirs(output_dir, exist_ok=True)

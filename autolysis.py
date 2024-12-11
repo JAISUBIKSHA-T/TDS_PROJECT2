@@ -113,111 +113,72 @@ def dbscan_clustering(data, output_dir):
     plt.close()
     return dbscan_path
 
+# Hierarchical Clustering
+def hierarchical_clustering(data, output_dir):
+    numeric_data = data.select_dtypes(include=np.number).dropna()
+    linked = linkage(numeric_data, 'ward')
+    plt.figure(figsize=(10, 7))
+    dendrogram(linked)
+    plt.title("Hierarchical Clustering Dendrogram")
+    plt.xlabel(numeric_data.columns[0], fontsize=12)
+    plt.ylabel(numeric_data.columns[1], fontsize=12)
+    hc_path = os.path.join(output_dir, "hierarchical_clustering.png")
+    plt.savefig(hc_path)
+    print("hierarchical_clustering.png created")
+    plt.close()
+    return hc_path
 
 
-def validate_data(data):
-    if data.empty:
-        raise ValueError("The input data is empty. Please check the file or input source.")
-    if data.shape[1] < 2:
-        raise ValueError("The input data must have at least two columns for visualization.")
+
 
 
 def gen_stat_visual(data, output_dir, visualization_type):
-    """
-    Generate a statistical visualization using an API-generated code and save it as a PNG.
-    
-
-    Args:
-        data (pd.DataFrame): The dataset.
-        output_dir (str): Directory to save the visualization.
-        visualization_type (str): Type of visualization (e.g., 'scatter', 'line').
-        api_key (str): API key for the external service.
-        API_URL (str): URL of the API to generate the code.
-
-    Returns:
-        str: Path to the saved visualization file.
-    """
-    # Filter numeric columns and drop NaN values
     data1 = data.select_dtypes(include=np.number).dropna()
-    data1=validate_data(data1)
-
-    # Ensure the output directory exists
-    os.makedirs(output_dir, exist_ok=True)
-
-    # Generate the filename dynamically based on visualization_type
-    sanitized_type = visualization_type.replace(" ", "_").lower()  # Sanitize filename
-    output_path = os.path.join(output_dir, f"{sanitized_type}.png")
-    
-
-    # Prompts for the API
-    prompt1 = "You are to generate a Python code for the given task. Only output the code and nothing else."
-    if visualization_type.lower() == 'heat map':
-        prompt2 = (
-            f"""Generate Python code to create a {visualization_type} plot using the seaborn library and save it as a PNG file in the directory '{output_dir}'.
-The dataset is a Pandas DataFrame named `data`. Use all numeric columns for the heatmap.Give graph title according to the data. 
-The filename for saving the plot should be '{output_path}'. Return only executable Python code."""
-        )
-    else:
-        prompt2 = (
-            f"""Generate Python code to create a {visualization_type} plot using the seaborn library and save it as a PNG file in the directory '{output_dir}'.
-The dataset is a Pandas DataFrame named `data`.
- X values for plot is data1.columns[0] and Y values for plot are data1.columns[1].Give graph title, axis labels according to the data.
-The filename for saving the plot should be '{output_path}'. Return only executable Python code."""
-        )
-
-    # API request payload
+    rg_path = os.path.join({output_dir}, "Regression map.png")
+    prompt = f"""
+    Generate Python code to create a {visualization_type} using the `seaborn` library. 
+    The dataset is a Pandas DataFrame named `data`. 
+    The code should save the visualization as a PNG file in the directory {output_dir}.
+    X values for plot is data1.columns[0] and Y values for plot are data1.columns[1].
+    plt.savefig({rg_path})
+    Return only executable Python code. Do not include Markdown formatting or explanations.
+    """
     headers = {"Authorization": f"Bearer {api_key}"}
     payload = {
         "model": "gpt-4o-mini",
-        "messages": [
-            {"role": "system", "content": prompt1},
-            {"role": "user", "content": prompt2},
-        ],
+        "messages": [{"role": "user", "content": prompt}],
         "max_tokens": 500,
-        "temperature": 0.7,
+        "temperature": 0.7
     }
 
-    # API call
     response = requests.post(API_URL, headers=headers, json=payload)
     response_data = response.json()
 
     if "choices" in response_data and response_data["choices"]:
         code = response_data["choices"][0]["message"]["content"]
-        
-        code = code.replace("```python", "").replace("```", "").strip()
 
-        print("Cleaned generated code:\n", code)
-
-        # Validate the code before execution (basic check for malicious content)
-        forbidden_keywords = ["exec(", "eval(", "__import__", "open("]
-        if any(keyword in code for keyword in forbidden_keywords):
-            raise ValueError("Generated code contains unsafe operations.")
-
-        # Save the code to a file for debugging (optional)
-        with open(os.path.join(output_dir, "generated_code.py"), "w") as file:
-            file.write(code)
-
-        
-
-        # Execute the code in a controlled environment
-        try:
-            local_vars = {"data": data1, "output_dir": output_dir}
-            exec(code, globals(), local_vars)
-        except Exception as e:
-            print("Error during code execution:")
-            print(code)
-            raise e
+        # Clean the code by removing Markdown or unwanted formatting
+        code = code.replace("```python", "").replace("```", "")
+        code_lines = code.split("\n")
+        code = "\n".join(line for line in code_lines if not line.startswith("```"))
+        print(code)
     else:
         raise ValueError("Failed to get code from API response.")
 
-     # Verify the file was created
-    if not os.path.exists(output_path):
-        raise FileNotFoundError(f"Graph file not found at {output_path}. Check the generated code or output directory.")
+    # Execute the cleaned code
+    try:
+        local_vars = {"data": data1, "output_dir": output_dir}
+        exec(code, globals(), local_vars)
+    except SyntaxError as e:
+        print("Syntax error in the generated code:")
+        print(code)
+        raise
+    except Exception as e:
+        print("Error during code execution:")
+        print(code)
+        raise
 
-    return output_path
-
-    
-
+    return rg_path
 
 
 
@@ -318,12 +279,10 @@ def analyze_and_generate_output(file_path):
     image_paths = {}
     image_paths['correlation_matrix'] = generate_correlation_matrix(data, output_dir)
     image_paths['dbscan_clusters'] = dbscan_clustering(data, output_dir)
-    image_paths['regression_map']=gen_stat_visual(data, output_dir, 'regression map')
-    image_paths['heat_map']=gen_stat_visual(data, output_dir, 'heat map')
-    print("images are creted")
     
     
-    
+
+    image_paths['regression map']=gen_stat_visual(data, output_dir, 'regression map')
 
     
     
@@ -351,18 +310,15 @@ def analyze_and_generate_output(file_path):
         f"Missing Values: {data_info['missing_values']}\n\n"
         f"Outlier Analysis: {data_info['outliers']}\n\n"
         "Create a narrative covering these points:\n"
-        f"Correlation matrix:{filenames[0]},\n"
+        f"Correlation matrix: {filenames[0]},\n"
         f"DBSCAN Clusters: {filenames[1]},\n"
-        f"Regression map: {filenames[2]}\n"
-        f"Heat map: {filenames[3]}\n"
-        
-        
+        f"regression map: {filenames[2]}\n"
     )
     narrative = query_llm_for_analysis(prompt)
     print(f"\nLLM Narrative:\n{narrative}")
 
     # Save the narrative to a README file
- #   save_readme(narrative, output_dir)
+    save_readme(narrative, output_dir)
 
 def resize_image(input_path, output_path, size=(300, 300)):
     """Resize an image to the specified size."""

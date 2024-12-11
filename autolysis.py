@@ -139,7 +139,7 @@ def gen_stat_visual(data, output_dir, visualization_type):
     """
     # Filter numeric columns and drop NaN values
     data1 = data.select_dtypes(include=np.number).dropna()
-    data1=vaildate_dta(data1)
+    data1=vaildate_data(data1)
 
     # Ensure the output directory exists
     os.makedirs(output_dir, exist_ok=True)

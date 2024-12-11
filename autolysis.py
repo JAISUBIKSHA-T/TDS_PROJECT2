@@ -1,5 +1,3 @@
-# Required files are given in meta data as requires and dependencies. So no need to install each time in pip command
-
 # /// script
 # requires-python = ">=3.11"
 # requires-openai=">=0.27.0"
@@ -7,7 +5,6 @@
 #   "httpx",
 #   "pandas",
 #   "seaborn",
-#   "requests",
 #   "matplotlib",
 #   "numpy",
 #   "scikit-learn",
@@ -30,7 +27,6 @@ import httpx
 import chardet
 import time
 import base64
-import requests
 from sklearn.cluster import KMeans, DBSCAN
 from scipy.cluster.hierarchy import dendrogram, linkage
 from sklearn.preprocessing import StandardScaler
@@ -38,10 +34,9 @@ from io import BytesIO
 from PIL import Image
 
 # Set the AIPROXY TOKEN
-#api_key = os.getenv("AIPROXY_TOKEN")
-AIPROXY_TOKEN='eyJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6IjIzZjIwMDE2OTZAZHMuc3R1ZHkuaWl0bS5hYy5pbiJ9.RI1VedMQmvVJGVO63TULkf-w86U0U7kWg_qd9baBxMU'
+api_key = os.getenv("AIPROXY_TOKEN")
 
-api_key=AIPROXY_TOKEN
+AIPROXY_TOKEN= api_key
 
 API_URL = "https://aiproxy.sanand.workers.dev/openai/v1/chat/completions"
 
@@ -53,41 +48,36 @@ if not AIPROXY_TOKEN:
 def load_data(file_path):
     try:
         with open(file_path, 'rb') as f:
-            result = chardet.detect(f.read())  # Detect the encoding of a file that may have different or unknown character encodings from different sources or systems.
-        encoding = result['encoding']   # which encoding among these('utf-8', 'ISO-8859-1','Windows-1252')
-        data = pd.read_csv(file_path, encoding=encoding)   # prevent issues where characters from different languages or symbols may appear as garbage or unreadable text when reading the CSV file
+            result = chardet.detect(f.read())  # Detect encoding
+        encoding = result['encoding']
+        data = pd.read_csv(file_path, encoding=encoding)
         return data
     except Exception as e:
         print(f"Error loading file {file_path}: {e}")
         sys.exit(1)
 
 # Perform basic analysis like summary stats, missing values, etc.
-
 def basic_analysis(data):
     summary = data.describe(include='all').to_dict()  # Summary statistics
     missing_values = data.isnull().sum().to_dict()  # Missing values
     column_info = data.dtypes.to_dict()  # Column types
     return {"summary": summary, "missing_values": missing_values, "column_info": column_info}
 
- #Robust outlier detection using IQR (Interquartile Range)        #Outliers - to identify extreme values in your dataset that could be errors or just rare events.
-
+# Robust outlier detection using IQR (Interquartile Range)
 def outlier_detection(data):
     numeric_data = data.select_dtypes(include=np.number)
     Q1 = numeric_data.quantile(0.25)
     Q3 = numeric_data.quantile(0.75)
-    IQR = Q3 - Q1              
+    IQR = Q3 - Q1
     outliers = ((numeric_data < (Q1 - 1.5 * IQR)) | (numeric_data > (Q3 + 1.5 * IQR))).sum().to_dict()
     return {"outliers": outliers}
 
 # Correlation Matrix
-
-def generate_correlation_matrix(data, output_dir):   # To find relationships between multiple variables
+def generate_correlation_matrix(data, output_dir):
     data = data.select_dtypes(include=[np.number])
     corr = data.corr()
     plt.figure(figsize=(10, 8))
     sns.heatmap(corr, annot=True, cmap="coolwarm")
-    plt.xlabel(data.columns[0], fontsize=12)
-    plt.ylabel(data.columns[1], fontsize=12)
     plt.title("Correlation Matrix")
     corr_path = os.path.join(output_dir, "correlation_matrix.png")
     plt.savefig(corr_path)
@@ -104,8 +94,6 @@ def dbscan_clustering(data, output_dir):
     numeric_data['cluster'] = clusters
     plt.figure(figsize=(8, 6))
     sns.scatterplot(x=numeric_data.iloc[:, 0], y=numeric_data.iloc[:, 1], hue=numeric_data['cluster'], palette="viridis")
-    plt.xlabel(numeric_data.columns[0], fontsize=12)
-    plt.ylabel(numeric_data.columns[1], fontsize=12)    
     plt.title("DBSCAN Clustering")
     dbscan_path = os.path.join(output_dir, "dbscan_clusters.png")
     plt.savefig(dbscan_path)
@@ -120,72 +108,14 @@ def hierarchical_clustering(data, output_dir):
     plt.figure(figsize=(10, 7))
     dendrogram(linked)
     plt.title("Hierarchical Clustering Dendrogram")
-    plt.xlabel(numeric_data.columns[0], fontsize=12)
-    plt.ylabel(numeric_data.columns[1], fontsize=12)
     hc_path = os.path.join(output_dir, "hierarchical_clustering.png")
     plt.savefig(hc_path)
     print("hierarchical_clustering.png created")
     plt.close()
     return hc_path
 
-
-
-
-
-def gen_stat_visual(data, output_dir, visualization_type):
-    data1 = data.select_dtypes(include=np.number).dropna()
-    rg_path = os.path.join({output_dir}, "Regression map.png")
-    prompt = f"""
-    Generate Python code to create a {visualization_type} using the `seaborn` library. 
-    The dataset is a Pandas DataFrame named `data`. 
-    The code should save the visualization as a PNG file in the directory {output_dir}.
-    X values for plot is data1.columns[0] and Y values for plot are data1.columns[1].
-    plt.savefig({rg_path})
-    Return only executable Python code. Do not include Markdown formatting or explanations.
-    """
-    headers = {"Authorization": f"Bearer {api_key}"}
-    payload = {
-        "model": "gpt-4o-mini",
-        "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 500,
-        "temperature": 0.7
-    }
-
-    response = requests.post(API_URL, headers=headers, json=payload)
-    response_data = response.json()
-
-    if "choices" in response_data and response_data["choices"]:
-        code = response_data["choices"][0]["message"]["content"]
-
-        # Clean the code by removing Markdown or unwanted formatting
-        code = code.replace("```python", "").replace("```", "")
-        code_lines = code.split("\n")
-        code = "\n".join(line for line in code_lines if not line.startswith("```"))
-        print(code)
-    else:
-        raise ValueError("Failed to get code from API response.")
-
-    # Execute the cleaned code
-    try:
-        local_vars = {"data": data1, "output_dir": output_dir}
-        exec(code, globals(), local_vars)
-    except SyntaxError as e:
-        print("Syntax error in the generated code:")
-        print(code)
-        raise
-    except Exception as e:
-        print("Error during code execution:")
-        print(code)
-        raise
-
-    return rg_path
-
-
-
-
-
-# Function to convert image to Base64  
-def image_to_base64(image_path, save_path):   #ensure the integrity of binary data during transmission
+# Function to convert image to Base64
+def image_to_base64(image_path, save_path):
     with Image.open(image_path) as img:
         target_width = 800
         width, height = img.size
@@ -193,14 +123,14 @@ def image_to_base64(image_path, save_path):   #ensure the integrity of binary da
         target_height = int(target_width * aspect_ratio)  # Maintain aspect ratio
 
         # Resize the image using LANCZOS filter
-        resized_img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)    # compress image before send to prompt
+        resized_img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
 
         # Ensure the directory exists before saving the image
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         print("Save path created")
 
         # Save the resized image to the given file path
-        resized_img.save(save_path, format="PNG")   # Save the image as PNG (or adjust format if needed)
+        resized_img.save(save_path, format="PNG")  # Save the image as PNG (or adjust format if needed)
         print("Saved")
 
         # Save the resized image to a BytesIO object (in-memory binary stream)
@@ -223,7 +153,7 @@ def query_llm_for_analysis(prompt):
     
     headers = {"Authorization": f"Bearer {AIPROXY_TOKEN}"}
     payload = {
-        "model": "gpt-4o-mini", 
+        "model": "gpt-4o-mini",  # or use the correct model
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": 1500,
         "temperature": 0.7
@@ -279,12 +209,9 @@ def analyze_and_generate_output(file_path):
     image_paths = {}
     image_paths['correlation_matrix'] = generate_correlation_matrix(data, output_dir)
     image_paths['dbscan_clusters'] = dbscan_clustering(data, output_dir)
-    
-    
+    image_paths['hierarchical_clustering'] = hierarchical_clustering(data, output_dir)
+    print("Images created:\n", image_paths)
 
-    image_paths['regression map']=gen_stat_visual(data, output_dir, 'regression map')
-
-    
     
     images_base64, filenames = process_images(image_paths, output_dir)
 
@@ -310,9 +237,8 @@ def analyze_and_generate_output(file_path):
         f"Missing Values: {data_info['missing_values']}\n\n"
         f"Outlier Analysis: {data_info['outliers']}\n\n"
         "Create a narrative covering these points:\n"
-        f"Correlation matrix: {filenames[0]},\n"
         f"DBSCAN Clusters: {filenames[1]},\n"
-        f"regression map: {filenames[2]}\n"
+        f"Hierarchical Clustering: {filenames[2]}\n"
     )
     narrative = query_llm_for_analysis(prompt)
     print(f"\nLLM Narrative:\n{narrative}")
@@ -350,6 +276,8 @@ def process_images(image_paths, output_dir, resize_size=(300, 300)):
         filenames.append(resized_image_path)
     
     return images_base64, filenames
+
+
 
 
 # Main execution function

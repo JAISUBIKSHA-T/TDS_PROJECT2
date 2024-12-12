@@ -115,13 +115,33 @@ def dbscan_clustering(data, output_dir):
     dbscan = DBSCAN(eps=0.5, min_samples=5)
     clusters = dbscan.fit_predict(scaled_data)
     numeric_data['cluster'] = clusters
+
+    # Dynamically set axis names based on column names
+    x_col = numeric_data.columns[0]  # First numeric column
+    y_col = numeric_data.columns[1]  # Second numeric column
+
+    # Set up the figure
     plt.figure(figsize=(8, 6))
-    sns.scatterplot(x=numeric_data.iloc[:, 0], y=numeric_data.iloc[:, 1], hue=numeric_data['cluster'], palette="viridis")
-    plt.title("DBSCAN Clustering")
+    
+    # Create scatterplot with dynamic axis labels and legend
+    scatterplot = sns.scatterplot(
+        x=numeric_data.iloc[:, 0],
+        y=numeric_data.iloc[:, 1],
+        hue=numeric_data['cluster'],
+        palette="viridis",
+        legend="full"
+    )
+    scatterplot.set_xlabel(x_col)  # Set x-axis name as column name
+    scatterplot.set_ylabel(y_col)  # Set y-axis name as column name
+    scatterplot.set_title("DBSCAN Clustering")  # Set plot title
+    scatterplot.legend(title="Cluster")  # Add legend title
+
+    # Save the plot
     dbscan_path = os.path.join(output_dir, "dbscan_clusters.png")
     plt.savefig(dbscan_path)
     print("dbscan_clusters.png created")
     plt.close()
+
     return dbscan_path
 
 
@@ -141,7 +161,7 @@ def gen_stat_visual(data, output_dir):
     prompt2 = (
             
             f"""Generate Python code to create a heatmap plot using the seaborn library and save it as a PNG file in the directory '{output_dir}'.
-The dataset is a Pandas DataFrame named `data`. Use all numeric columns for the heatmap.Give graph title according to the data. 
+The dataset is a Pandas DataFrame named `data`. Use all numeric columns for the heatmap.Give graph title according to the data.Give proper label names and legents if needed. 
 The filename for saving the plot should be '{output_path}'. Return only executable Python code."""  )
         
 
@@ -266,7 +286,6 @@ def analyze_and_generate_output(file_path):
     # Generate visualizations and save file paths
     image_paths = {}
     image_paths['combine_histogram']=combine_histograms(data, numeric_columns, output_dir)
-    image_paths['correlation_matrix'] = generate_correlation_matrix(data, output_dir)
     image_paths['dbscan_clusters'] = dbscan_clustering(data, output_dir)
     image_paths['heatmap'] = gen_stat_visual(data, output_dir)
     

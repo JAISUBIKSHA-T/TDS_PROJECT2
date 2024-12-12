@@ -1,3 +1,4 @@
+# Required files are given in meta data as requires and dependencies. So no need to install each time in pip command
 # /// script
 # requires-python = ">=3.11"
 # requires-openai=">=0.27.0"
@@ -17,6 +18,7 @@
 # ]
 # ///
 
+
 import pandas as pd
 import numpy as np
 import seaborn as sns
@@ -30,44 +32,67 @@ import base64
 from sklearn.cluster import DBSCAN
 from scipy.cluster.hierarchy import dendrogram, linkage
 from sklearn.preprocessing import StandardScaler
+from PIL import Image
 
-
-
-
-
-
-# Set the AIPROXY TOKEN
+# Set the AIPROXY TOKEN from environment variable
 api_key = os.getenv("AIPROXY_TOKEN")
+AIPROXY_TOKEN = api_key
 
-AIPROXY_TOKEN= api_key
-
+# Set the API URL for querying the LLM
 API_URL = "https://aiproxy.sanand.workers.dev/openai/v1/chat/completions"
 
 if not AIPROXY_TOKEN:
     print("Error: AIPROXY_TOKEN environment variable is not set.")
     sys.exit(1)
 
-# Load the 'csv' file
+# Load the CSV file with automatic encoding detection
 def load_data(file_path):
+    """
+    Load CSV data while automatically detecting the encoding to prevent read errors.
+    
+    Args:
+        file_path (str): Path to the CSV file to load.
+    
+    Returns:
+        pd.DataFrame: The loaded dataset.
+    """
     try:
         with open(file_path, 'rb') as f:
-            result = chardet.detect(f.read())  # Detect encoding
+            result = chardet.detect(f.read())  # Detect the file's encoding
         encoding = result['encoding']
-        data = pd.read_csv(file_path, encoding=encoding)
+        data = pd.read_csv(file_path, encoding=encoding)  # Load CSV with the detected encoding
         return data
     except Exception as e:
         print(f"Error loading file {file_path}: {e}")
         sys.exit(1)
 
-# Perform basic analysis like summary stats, missing values, etc.
+# Perform basic analysis on the dataset
 def basic_analysis(data):
-    summary = data.describe(include='all').to_dict()  # Summary statistics
-    missing_values = data.isnull().sum().to_dict()  # Missing values
-    column_info = data.dtypes.to_dict()  # Column types
+    """
+    Generate basic statistical analysis and summarize missing values and column types.
+    
+    Args:
+        data (pd.DataFrame): The dataset to analyze.
+    
+    Returns:
+        dict: A dictionary with summary statistics, missing values, and column types.
+    """
+    summary = data.describe(include='all').to_dict()
+    missing_values = data.isnull().sum().to_dict()
+    column_info = data.dtypes.to_dict()
     return {"summary": summary, "missing_values": missing_values, "column_info": column_info}
 
-# Robust outlier detection using IQR (Interquartile Range)
+# Perform outlier detection using Interquartile Range (IQR)
 def outlier_detection(data):
+    """
+    Detect outliers in the dataset using the IQR method.
+    
+    Args:
+        data (pd.DataFrame): The dataset to analyze.
+    
+    Returns:
+        dict: A dictionary containing the number of outliers per numeric column.
+    """
     numeric_data = data.select_dtypes(include=np.number)
     Q1 = numeric_data.quantile(0.25)
     Q3 = numeric_data.quantile(0.75)
@@ -75,40 +100,55 @@ def outlier_detection(data):
     outliers = ((numeric_data < (Q1 - 1.5 * IQR)) | (numeric_data > (Q3 + 1.5 * IQR))).sum().to_dict()
     return {"outliers": outliers}
 
-
+# Combine histograms for specified columns
 def combine_histograms(data, columns, output_dir):
-    num_cols = 3  # Number of columns in the grid
-    num_rows = (len(columns) + num_cols - 1) // num_cols  # Compute the number of rows needed
+    """
+    Create histograms for specified columns and save them as a single image.
+    
+    Args:
+        data (pd.DataFrame): The dataset to visualize.
+        columns (list): List of column names to plot histograms for.
+        output_dir (str): Directory to save the generated histogram image.
+    
+    Returns:
+        str: Path to the saved histogram image.
+    """
+    num_cols = 3
+    num_rows = (len(columns) + num_cols - 1) // num_cols
     fig, axes = plt.subplots(num_rows, num_cols, figsize=(14, num_rows * 5))
 
-    # Flatten axes if it's a numpy.ndarray 
-    if isinstance(axes, np.ndarray): 
-       axes = axes.flatten()
+    if isinstance(axes, np.ndarray):
+        axes = axes.flatten()
 
     for i, col in enumerate(columns):
-        # ax = axes[i // num_cols, i % num_cols]
-        ax=axes[i]
+        ax = axes[i]
         sns.histplot(data[col], kde=True, color='skyblue', ax=ax)
         ax.set_title(f'Distribution of {col}')
         ax.set_xlabel(col)
         ax.set_ylabel('Frequency')
-    
-    # Remove any empty subplots
+
     for j in range(i + 1, num_rows * num_cols):
-        # fig.delaxes(axes[j // num_cols, j % num_cols])
         fig.delaxes(axes[j])
-    
+
     plt.tight_layout()
     histogram_path = os.path.join(output_dir, "histogram.png")
     plt.savefig(histogram_path)
-    
     plt.close()
 
     return histogram_path
 
-    
-# DBSCAN clustering (Density-Based Clustering)
+# Perform DBSCAN clustering
 def dbscan_clustering(data, output_dir):
+    """
+    Apply DBSCAN clustering algorithm and generate a scatter plot of clusters.
+    
+    Args:
+        data (pd.DataFrame): The dataset to cluster.
+        output_dir (str): Directory to save the generated cluster plot.
+    
+    Returns:
+        str: Path to the saved cluster plot.
+    """
     numeric_data = data.select_dtypes(include=np.number).dropna()
     scaler = StandardScaler()
     scaled_data = scaler.fit_transform(numeric_data)
@@ -116,14 +156,10 @@ def dbscan_clustering(data, output_dir):
     clusters = dbscan.fit_predict(scaled_data)
     numeric_data['cluster'] = clusters
 
-    # Dynamically set axis names based on column names
-    x_col = numeric_data.columns[0]  # First numeric column
-    y_col = numeric_data.columns[1]  # Second numeric column
+    x_col = numeric_data.columns[0]
+    y_col = numeric_data.columns[1]
 
-    # Set up the figure
     plt.figure(figsize=(8, 6))
-    
-    # Create scatterplot with dynamic axis labels and legend
     scatterplot = sns.scatterplot(
         x=numeric_data.iloc[:, 0],
         y=numeric_data.iloc[:, 1],
@@ -131,173 +167,124 @@ def dbscan_clustering(data, output_dir):
         palette="viridis",
         legend="full"
     )
-    scatterplot.set_xlabel(x_col)  # Set x-axis name as column name
-    scatterplot.set_ylabel(y_col)  # Set y-axis name as column name
-    scatterplot.set_title("DBSCAN Clustering")  # Set plot title
-    scatterplot.legend(title="Cluster")  # Add legend title
+    scatterplot.set_xlabel(x_col)
+    scatterplot.set_ylabel(y_col)
+    scatterplot.set_title("DBSCAN Clustering")
+    scatterplot.legend(title="Cluster")
 
-    # Save the plot
     dbscan_path = os.path.join(output_dir, "dbscan_clusters.png")
     plt.savefig(dbscan_path)
-    print("dbscan_clusters.png created")
     plt.close()
 
     return dbscan_path
 
-
-  
-def gen_stat_visual(data, output_dir):
+# Generate a correlation heatmap
+def generate_visualizations(data, output_dir):
+    """
+    Generate visualizations including heatmaps for correlation analysis.
     
-    # Filter numeric columns and drop NaN values
-    data1 = data.select_dtypes(include=np.number).dropna()
-
-    # Ensure the output directory exists
-    os.makedirs(output_dir, exist_ok=True)
-
-    # Generate the filename dynamically based on visualization_type
+    Args:
+        data (pd.DataFrame): The dataset to visualize.
+        output_dir (str): Directory to save the visualizations.
     
-    output_path = os.path.join(output_dir, "heatmap.png")
-    prompt1 = "You are to generate a Python code for the given task. Only output the code and nothing else."   
-    prompt2 = (
-            
-            f"""Generate Python code to create a heatmap plot using the seaborn library and save it as a PNG file in the directory '{output_dir}'.
-The dataset is a Pandas DataFrame named `data`. Use all numeric columns for the heatmap.Give graph title according to the data.Give proper label names and legents if needed. 
-The filename for saving the plot should be '{output_path}'. Return only executable Python code."""  )
-        
+    Returns:
+        str: Path to the saved heatmap.
+    """
+    numeric_data = data.select_dtypes(include=np.number).dropna()
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(numeric_data.corr(), annot=True, cmap="coolwarm")
+    heatmap_path = f"{output_dir}/heatmap.png"
+    plt.title("Correlation Heatmap")
+    plt.savefig(heatmap_path)
+    plt.close()
+    return heatmap_path
 
-    # API request payload
-    headers = {"Authorization": f"Bearer {api_key}"}
+# Query the LLM for analysis or generation of content
+def query_llm_for_analysis(prompt):
+    """
+    Send a prompt to the LLM API and handle retries for rate limiting.
+    
+    Args:
+        prompt (str): The prompt to send to the LLM.
+    
+    Returns:
+        str: The response from the LLM.
+    """
+    headers = {"Authorization": f"Bearer {AIPROXY_TOKEN}"}
     payload = {
         "model": "gpt-4o-mini",
-        "messages": [
-            
-            {"role": "system", "content": prompt1},
-            {"role": "user", "content": prompt2},
-        ],
-        "max_tokens": 500,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 1000,
         "temperature": 0.7,
     }
 
-    # API call
-    response = httpx.post(API_URL, headers=headers, json=payload, timeout=60)
-    response_data = response.json()
+    retries = 10
+    backoff_factor = 2
+    max_wait_time = 60
 
-    if "choices" in response_data and response_data["choices"]:
-        code = response_data["choices"][0]["message"]["content"]
-        
-        code = code.replace("```python", "").replace("```", "").strip()
-
-        print("Cleaned generated code:\n", code)
-
-        # Validate the code before execution (basic check for malicious content)
-        forbidden_keywords = ["exec(", "eval(", "__import__", "open("]
-        if any(keyword in code for keyword in forbidden_keywords):
-            raise ValueError("Generated code contains unsafe operations.")
-
-        # Save the code to a file for debugging (optional)
-        with open(os.path.join(output_dir, "generated_code.py"), "w") as file:
-            file.write(code)
-
-
-        
-
-        # Execute the code in a controlled environment
-        try:
-            local_vars = {"data": data1, "output_dir": output_dir}
-            exec(code, globals(), local_vars)
-        except Exception as e:
-            print("Error during code execution:")
-            print(code)
-            raise e
-    else:
-        raise ValueError("Failed to get code from API response.")
-
-     # Verify the file was created
-    if not os.path.exists(output_path):
-        raise FileNotFoundError(f"Graph file not found at {output_path}. Check the generated code or output directory.")
-
-    return output_path
-
-
-
-
-# Function to send the data info to the LLM and request analysis or code
-def query_llm_for_analysis(prompt):
-    
-    
-
-    # Prepare the prompt to query the LLM
-    
-    headers = {"Authorization": f"Bearer {AIPROXY_TOKEN}"}
-    payload = {
-        "model": "gpt-4o-mini",  # or use the correct model
-        "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 1500,
-        "temperature": 0.7
-    }
-
-    retries = 10  # Increased retries before giving up
-    backoff_factor = 2  # Exponential backoff factor
-    max_wait_time = 60  # Maximum wait time (1 minute) to prevent indefinite retries
-
-    for attempt in range(retries):
+    for attempt in range(1, retries + 1):
         try:
             response = httpx.post(API_URL, headers=headers, json=payload, timeout=60)
             response.raise_for_status()
             return response.json()["choices"][0]["message"]["content"].strip()
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 429:
-                # Exponential backoff with a cap on wait time
                 wait_time = min(backoff_factor ** attempt, max_wait_time)
-                print(f"Rate limit hit, retrying in {wait_time} seconds...")
+                print(f"Rate limit hit (attempt {attempt}/{retries}), retrying in {wait_time} seconds...")
                 time.sleep(wait_time)
             else:
-                print(f"Error querying the LLM: {e}")
+                print(f"HTTP error: {e.response.status_code}, message: {e.response.text}")
                 break
         except httpx.RequestError as e:
-            print(f"Error querying the LLM: {e}")
+            print(f"Request error: {e}")
             break
 
     print("Max retries reached, giving up.")
-    sys.exit(1)  # Exit after retries have failed
+    sys.exit(1)
 
-# Save results in a Markdown README
+# Generate a markdown readme file with the analysis results
 def save_readme(content, output_dir):
+    """
+    Save the generated narrative content to a markdown file.
+    
+    Args:
+        content (str): The content to write to the README file.
+        output_dir (str): The directory where the README file should be saved.
+    """
     with open(os.path.join(output_dir, "README.md"), "w") as f:
         f.write(content)
-        print("Readme saved")
+    print("Readme saved")
 
-# Function to analyze and generate output for each file
+# Main function to analyze the dataset and generate output
 def analyze_and_generate_output(file_path):
+    """
+    Analyze the dataset, perform clustering, generate visualizations, and create a report.
+    
+    Args:
+        file_path (str): Path to the dataset (CSV file).
+    """
     base_name = os.path.splitext(os.path.basename(file_path))[0]
     output_dir = os.path.join(".", base_name)
     os.makedirs(output_dir, exist_ok=True)
-
-    # Load data
+    
     data = load_data(file_path)
     numeric_columns = data.select_dtypes(include=['number']).columns
-    print("Data loaded")
     
-    # Perform basic analysis
     analysis = basic_analysis(data)
     outliers = outlier_detection(data)
     combined_analysis = {**analysis, **outliers}
-
-    # Generate visualizations and save file paths
-    image_paths = {}
-    image_paths['combine_histogram']=combine_histograms(data, numeric_columns, output_dir)
-    image_paths['dbscan_clusters'] = dbscan_clustering(data, output_dir)
-    image_paths['heatmap'] = gen_stat_visual(data, output_dir)
     
-    print("Images created:\n", image_paths)
-
-    # Format image paths for the prompt
+    image_paths = {
+        'combine_histogram': combine_histograms(data, numeric_columns, output_dir),
+        'dbscan_clusters': dbscan_clustering(data, output_dir),
+        'heatmap': generate_visualizations(data, output_dir),
+    }
+    
     formatted_image_paths = "\n".join(
         f"- {key.replace('_', ' ').title()}: {path}"
         for key, path in image_paths.items()
     )
-    
-    # Send data to LLM for analysis and suggestions
+
     data_info = {
         "filename": file_path,
         "summary": combined_analysis["summary"],
@@ -306,25 +293,34 @@ def analyze_and_generate_output(file_path):
     }
     
     prompt = (
-        "You are a creative storyteller. "
-        "Craft a compelling narrative based on this dataset analysis:\n\n"
-        f"Data Summary: {data_info['summary']}\n\n"
-        f"Missing Values: {data_info['missing_values']}\n\n"
-        f"Outlier Analysis: {data_info['outliers']}\n\n"
-        f"Visualizations:\n{formatted_image_paths}\n\n"
-        "Create a narrative covering these points."
+        "You are a creative storyteller tasked with creating a narrative based on a dataset analysis. "
+        "Please structure the narrative as follows:\n\n"
+        "1. **Introduction**:\n"
+        "   - Provide an overview of the dataset, its purpose, and key insights from the data summary.\n\n"
+        "2. **Data Quality Assessment**:\n"
+        "   - Highlight missing values and how they might impact the analysis.\n\n"
+        "3. **Outlier Analysis**:\n"
+        "   - Discuss the outliers detected, their potential implications, and how they are addressed.\n\n"
+        "4. **Visual Insights**:\n"
+        "   - Describe the visualizations provided and what they reveal about the dataset.\n\n"
+        "5. **Clustering Analysis**:\n"
+        "   - Explain the clustering results (e.g., DBSCAN) and any patterns observed among the clusters.\n\n"
+        "Here is the analysis information for reference:\n\n"
+        f"**Data Summary**:\n{data_info['summary']}\n\n"
+        f"**Missing Values**:\n{data_info['missing_values']}\n\n"
+        f"**Outlier Analysis**:\n{data_info['outliers']}\n\n"
+        f"**Visualizations**:\n{formatted_image_paths}\n\n"
+        "Based on this, craft a compelling narrative covering all the above points in order."
     )
 
     narrative = query_llm_for_analysis(prompt)
-    print(f"\nLLM Narrative:\n{narrative}")
-
-    # Save the narrative to a README file
     save_readme(narrative, output_dir)
 
-
-
-# Main execution function
+# Main function execution
 def main():
+    """
+    Main entry point of the program. Expects a CSV file as input and processes it.
+    """
     if len(sys.argv) != 2:
         print("Usage: python autolysis.py <dataset.csv>")
         sys.exit(1)
@@ -334,3 +330,9 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+
+
+

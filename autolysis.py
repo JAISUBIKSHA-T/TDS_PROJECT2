@@ -179,7 +179,7 @@ The filename for saving the plot should be '{output_path}'. Return only executab
     }
 
     # API call
-    response = httpx.post(API_URL, headers=headers, json=payload)
+    response = httpx.post(API_URL, headers=headers, json=payload, timeout=60)
     response_data = response.json()
 
     if "choices" in response_data and response_data["choices"]:
@@ -242,7 +242,7 @@ def query_llm_for_analysis(prompt):
 
     for attempt in range(retries):
         try:
-            response = httpx.post(API_URL, headers=headers, json=payload, timeout=30)
+            response = httpx.post(API_URL, headers=headers, json=payload, timeout=60)
             response.raise_for_status()
             return response.json()["choices"][0]["message"]["content"].strip()
         except httpx.HTTPStatusError as e:

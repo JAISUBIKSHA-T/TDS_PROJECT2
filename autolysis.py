@@ -77,10 +77,10 @@ def create_output_dir(dataset_file):
         os.makedirs(output_dir)
     print("Output directory created")
     return output_dir
-def write_file(file_name, content, output_dir):
+def write_file(file_name):
     """Write content to a file in the specified directory."""
     output_path = os.path.join(output_dir, file_name)
-    with open(output_path, 'w', encoding='utf-8') as file:
+    with open(filename, 'w', encoding='utf-8') as file:
         file.write(content)
         
 import shutil
@@ -858,7 +858,7 @@ def main():
     # Describe the given dataset.
     generic_analysis_results = generic_analysis(data=df)
     generated_desc = describe_generic_analysis(generic_analysis_results, dataset_file, df, api_key)
-    write_file('README.md', generated_desc,output_dir)
+    write_file('README.md', generated_desc)
 
     # Consult LLM and perform analysis.
     meta_analysis_results = meta_analyse(dataset_file, df, api_key)
@@ -871,7 +871,7 @@ def main():
     generated_meta_analysis_descriptions = describe_meta_analysis(meta_analysis_results, dataset_file, df, api_key)
 
     for meta_analysis_description in generated_meta_analysis_descriptions:
-        write_file('README.md', meta_analysis_description,output_dir)
+        write_file('README.md', meta_analysis_description)
 
 
 if __name__ == '__main__':

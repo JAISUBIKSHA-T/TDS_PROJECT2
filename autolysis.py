@@ -157,7 +157,7 @@ def image_info(base64_image, prompt, api_key, model='gpt-4o-mini'):
     url = 'https://aiproxy.sanand.workers.dev/openai/v1/chat/completions'
     headers = {        'Content-Type': 'application/json',
         'Authorization': f'Bearer {api_key}'    }
-    data = {        'model': model,'temperature':0.7,
+    data = {        'model': model,
         'messages': [    {  'role': 'user',
                 'content': [   { 'type': 'text','text': prompt   },
                     { 'type': 'image_url',
@@ -188,7 +188,7 @@ def calling_chat_function(prompt, api_key, function_descriptions, model='gpt-4o-
         'Authorization': f'Bearer {api_key}'
     }
     data = {
-        'model': model,'temperature':0.7,
+        'model': model,
         'messages': [
             {
                 'role': 'user',
@@ -336,11 +336,13 @@ def regression_analysis(dataset_file, data, api_key):
 
     With features:
     {columns_info}
+
     Here is a sample:
     {data.iloc[0, :]}
+
     Extract the features and target for Regression task.
     Note: Do not include column names that include the word 'id'.
-    Narrate in an interesting way.
+
     Make sure to NOT include the target variable in the features list.
     """
     
@@ -411,7 +413,6 @@ def correlation_analysis(dataset_file, data, api_key):
     {data.iloc[0, :]}
     Extract only the most important features to perform a Correlation analysis.
     Eg. 'height', 'weight', etc.
-    Narrate in an interesting way.
     Note: Do not include column names that include the word 'id'.
     Hint: Use function filter_features.    """
     
@@ -450,8 +451,7 @@ def cluster_analysis(dataset_file, data, api_key):
     Here is a sample:
     {data.iloc[0, :]}
     Extract only the most important features to perform a Clustering analysis using K-Means.
-    Note: Do not include column names that include the word 'id'.
-    Narrate in an interesting way.
+    Note: Do not include column names that include the word 'id'. 
     Hint: Use function filter_features.    """
     
     response = calling_chat_function(prompt=prompt, api_key=api_key, function_descriptions=filter_function_descriptions)
@@ -498,7 +498,6 @@ def classification_analysis(dataset_file, data, api_key):
     Extract the features and target for Classification task.
     Note: Do not include column names that include the word 'id'.
     Make sure to NOT include the target variable in the features list.
-    Narrate in an interesting way.
     Note: The target column should be categorical datatype.    """
 
     response = calling_chat_function(prompt=prompt, api_key=api_key, function_descriptions=filter_function_descriptions)
@@ -563,8 +562,7 @@ def time_series_analysis(dataset_file, data, api_key):
     Here is a sample:
     {data.iloc[0, :]}
     Extract the date column and the numerical column.
-    Note: Do not include column names that include the word 'id'.
-    Narrate in an interesting way like a story teller.
+    Note: Do not include column names that include the word 'id'. 
     Hint: Use function extract_time_series_data.    """
     
     response = calling_chat_function(prompt=prompt, api_key=api_key, function_descriptions=filter_function_descriptions)
@@ -727,7 +725,7 @@ def meta_analyse(dataset_file, data, api_key):
     
     prompt = f"""\
     You are given a file {dataset_file}.
-    As a creative story teller narrate the analysis.
+
     With features:
     {columns_info}
 
@@ -737,7 +735,7 @@ def meta_analyse(dataset_file, data, api_key):
     Note: Perform only the appropriate analyses.
 
     Analysis options:
-       {unorder_list_analyses}
+    {unorder_list_analyses}
 
     Call the choose_analysis function with the correct options.
     """
@@ -811,7 +809,7 @@ def describe_meta_analysis(results, dataset_file, data, api_key):
         * Try to infer insights from the results of the analysis.
         * Provide a description about the insights you discovered.
         * Give the implications of your findings.
-        Make the analysis in an efficient way.
+
         Output in valid markdown format.
         """
     
@@ -831,7 +829,7 @@ def describe_meta_analysis(results, dataset_file, data, api_key):
 
             Chart Analysis Summary:
             {image_analysis}
-            Make the analysis in an efficient way like a creativestory teller.
+
             Output in valid markdown format.
             """
         prompt = prompt.encode('ascii', 'ignore').decode('ascii')
@@ -854,11 +852,11 @@ def create_output_dir(dataset_file):
     print("Output directory created")
     return output_dir
 
-def write_file(file_name, content):
+'''def write_file(file_name, content, output_dir):
     """Write content to a file in the specified directory."""
-    
-    with open(file_name, 'w', encoding='utf-8') as file:
-        file.write(content)
+    output_path = os.path.join(output_dir, file_name)
+    with open(output_path, 'w', encoding='utf-8') as file:
+        file.write(content)'''
 
 def save_chart(chart_name, output_dir):
     """Save the chart PNG to the output directory."""

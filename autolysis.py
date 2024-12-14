@@ -1,359 +1,901 @@
-# Required libraries are given in meta data as requires and dependencies. So no need to install each time 
+
+# Required files are given in meta data as requires and dependencies. So no need to install each time in pip command
 # /// script
-# requires-python = ">=3.6,<3.10"
+# requires-python = ">=3.13"
 # dependencies = [
-#   "pandas",
-#   "numpy",
-#   "matplotlib",
-#   "seaborn",
-#   "requests",
-#   "umap-learn",
-#   "hdbscan",
-#   "chardet",
-#   "scikit-learn",
-#   "scipy",
-#   "python-dotenv",
-#   "scikit-learn>=1.6.0"
+#     "chardet",
+#     "matplotlib",
+#     "pandas",
+#     "python-dotenv",
+#     "requests",
+#     "scikit-learn",
+#     "seaborn",
+#     "statsmodels",
+#     "tabulate",
 # ]
 # ///
 
 
-#import files
+# Import files needed
+
+import os
+import sys
+import base64
+import io
+import json
+from dotenv import load_dotenv
 import pandas as pd
-import numpy as np
+import chardet
+import requests
+
 import matplotlib.pyplot as plt
 import seaborn as sns
-import umap
-import hdbscan
-import os
-import chardet
-import io
-import requests
-import sys
-import warnings
 
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-from sklearn.impute import SimpleImputer
-from sklearn.feature_selection import mutual_info_classif
-from scipy import stats
-from dotenv import load_dotenv
-from sklearn.ensemble import IsolationForest
+
+# Load the data file. Before that decode it
 """
- The load_dotenv() function is part of the python-dotenv library and is used to load environment variables from a .env file into Python application.
- This is useful for managing sensitive information such as API keys, database credentials, or configuration settings."""
- 
-load_dotenv()
+ load_dotenv() used to load environment variables from a .env file into the environment.
+ To manage configuration settings, especially  to avoid hardcoding sensitive information (e.g., API keys, database credentials) directly in the code."""
 
-#set the API_URL
-API_URL = "https://aiproxy.sanand.workers.dev/openai/v1/chat/completions"
+def load_env_key():
+    load_dotenv()
+    try:
+        api_key = os.environ["AIPROXY_TOKEN"]
+    except KeyError:
+        print("Error: AIPROXY_TOKEN is not set in the environment.")
+        sys.exit(1)
+    return api_key
 
-""" Class to load the csv file.
-Find the encodins type and decodethe file.
-Store the data in dataframe df"""
+
+def get_dataset():   # check whether the input is given in the correct format
+    if len(sys.argv) != 2:
+        print("Usage: python autolysis.py <dataset.csv>")
+        sys.exit(1)
+    return sys.argv[1]
 
 
-class Csv_Load:
-    def __init__(self, csv_path):
-        self.csv_path = csv_path
-        self.df = self._read_csv_with_encoding(csv_path)
-        self.original_columns = self.df.columns.tolist()
-        self.missing_values = self.df.isnull().sum()
+def get_dataset_encoding(dataset_file): # check whether the file is present or not
+    if not os.path.isfile(dataset_file):
+        print(f"Error: File '{dataset_file}' not found.")
+        sys.exit(1)
+    
+    with open(dataset_file, 'rb') as f:
+        result = chardet.detect(f.read()) # chardet -Automatically detecting the encoding to prevent read errors.
+    
+    print(f'File Info: {result}')
+    return result.get('encoding', 'utf-8')
 
-    """Function to read the csv file.
-    select the appropriate encoding and decode the file"""
+
+def write_file(file_name, text_content, title=None):
+    with open(file_name, "a") as f:
+        if title:
+            f.write("# " + title + "\n\n")
         
-    def _read_csv_with_encoding(self, csv_path):
-        encodings_to_try = [
-            'utf-8-sig',
-            'utf-8',
-            'latin-1',
-            'iso-8859-1',
-            'cp1252',
+        if text_content is not None and text_content.startswith("```markdown"):
+            text_content = text_content.replace("```markdown", "", 1).strip().rstrip("```").strip()
+
+        else:
+            print("text_content is None or does not start with the expected prefix.")
+
+
+        f.write(text_content)
+        f.write('\n\n')
+
+
+def encode_image(image_path):
+    """ convert the images into base 64 so that they can easily sent to llm analysis"""
+    with open(image_path, 'rb') as image_file:
+        return base64.b64encode(image_file.read()).decode('utf-8')
+
+
+def name_chart_file():  # name each png images 
+    cwd = os.getcwd()
+    png_files = [file for file in os.listdir(cwd) if file.endswith(".png")]
+    count = len(png_files)
+
+    return f'chart_{count + 1}'
+
+
+# AI Proxy Functions
+def text_embedding(query, api_key, model='text-embedding-3-small'):
+    """AI Proxy Functions: These are the functions provoking AI to text embedding# AI Proxy Functions: These are the functions provoking AI to text embedding.
+        set input and model name"""
+    url = "https://aiproxy.sanand.workers.dev/openai/v1/embeddings"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "input": query,
+        "model": model,
+        "encoding_format": "float"
+    }
+    response = requests.post(url, headers=headers, json=data)
+    return response.json()['data']
+
+
+def chat(prompt, api_key, model='gpt-4o-mini'):
+    
+    # send chat data with prompt and key to API. using model gpt-4o-mini
+    
+    url = 'https://aiproxy.sanand.workers.dev/openai/v1/chat/completions'
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {api_key}'
+    }
+    data = {
+        'model': model,
+        'messages': [
+            {
+                'role': 'system',
+                'content': 'You are a concise assistant and a data science expert. Provide brief and to-the-point answers.'
+            },
+            {
+                'role': 'user',
+                'content': prompt
+            }
         ]
+    }
+    response = requests.post(url, headers=headers, json=data)
+    output = response.json()
 
-        with open(csv_path, 'rb') as rawdata:
-            result = chardet.detect(rawdata.read(100000))
-            detected_encoding = result['encoding']
-
-            if detected_encoding and detected_encoding.lower() not in map(str.lower, encodings_to_try):
-                encodings_to_try.insert(0, detected_encoding)
-
-        # reading with different encodings
-        for encoding in encodings_to_try:
-            try:
-                try:
-                    df = pd.read_csv(csv_path,
-                                     encoding=encoding,
-                                     low_memory=False,
-                                     on_bad_lines='skip')
-
-                    if not df.empty:
-                        print(f"Successfully read CSV with {encoding} encoding")
-                        return df
-
-                except Exception as e:
-                    print(f"Not using Standard read ")
-
-                    with open(csv_path, 'r', encoding=encoding, errors='replace') as f:
-                        file_content = f.read()
-
-                    df = pd.read_csv(io.StringIO(file_content),
-                                     low_memory=False,
-                                     on_bad_lines='skip')
-
-                    if not df.empty:
-                        print(f"Successfully read CSV with {encoding} encoding using error replacement")
-                        return df
-
-            except Exception as e:
-                print(f"Failed to read CSV with {encoding} encoding: {e}")
-                continue
-
-        raise ValueError(f"Could not read CSV file with any of the attempted encodings. "
-                         f"Please check the file integrity and encoding.")
-
-    #Organize the data by grouping them according to the datatype
-    def arrange_data(self):
-        
-        numeric_columns = self.df.select_dtypes(include=['int64', 'float64']).columns
-        categorical_columns = self.df.select_dtypes(include=['object']).columns
-        warnings.filterwarnings("ignore", message=".*force_all_finite.*")
-        numeric_imputer = SimpleImputer(strategy='median')
-        self.df[numeric_columns] = numeric_imputer.fit_transform(self.df[numeric_columns])
-
-        categorical_imputer = SimpleImputer(strategy='most_frequent')
-        self.df[categorical_columns] = categorical_imputer.fit_transform(self.df[categorical_columns])
-     
-
-
-        # Label Encoding for categorical columns
-        self.label_encoders = {}
-        for col in categorical_columns:
-            le = LabelEncoder()
-            self.df[f'{col}_encoded'] = le.fit_transform(self.df[col])
-            self.label_encoders[col] = le
-
-
-"""Use different analyzation techniques such as Correlation analysis,Outliers and Cluster analysis  """
-class Data_Analyze:
-    def __init__(self, df):
-        self.df = df
-
-    def descriptive_analysis(self):
-        numeric_cols = self.df.select_dtypes(include=['int64', 'float64']).columns
-        desc_stats = self.df[numeric_cols].describe().to_dict()
-
-        skewness = self.df[numeric_cols].apply(lambda x: stats.skew(x)).to_dict()
-        kurtosis = self.df[numeric_cols].apply(lambda x: stats.kurtosis(x)).to_dict()
-
-        return {
-            'description': desc_stats,
-            'skewness': skewness,
-            'kurtosis': kurtosis
-        }
-
-    def correlation_analysis(self):
-        numeric_cols = self.df.select_dtypes(include=['int64', 'float64']).columns
-        encoded_cols = [col for col in self.df.columns if col.endswith('_encoded')]
-
-        corr_matrix = self.df[numeric_cols].corr()
-
-        mutual_info = {}
-        for col in numeric_cols:
-            try:
-                target = numeric_cols[0] if len(numeric_cols) > 1 else None
-                if target and target != col:
-                    mi_scores = mutual_info_classif(self.df[[col]], self.df[target])
-                    mutual_info[col] = mi_scores[0]
-            except:
-                pass
-
-        return {
-            'correlation_matrix': corr_matrix.to_dict(),
-            'mutual_information': mutual_info
-        }
-
-    def outlier_detection(self):
-        numeric_cols = self.df.select_dtypes(include=['int64', 'float64']).columns
-
-        z_scores = {}
-        outliers = {}
-        for col in numeric_cols:
-            z = np.abs(stats.zscore(self.df[col]))
-            z_scores[col] = z.tolist()
-            outliers[col] = self.df[z > 3][col].tolist()
-
-        return {
-            'z_scores': z_scores,
-            'outliers': outliers
-        }
+    if output.get('error', None):
+        print('LLM Error:\n', output)
+        return None
     
-    def anomaly_detection(self):
-        numeric_cols = self.df.select_dtypes(include=['int64', 'float64']).columns
-
-        anomalies = {}
-        for col in numeric_cols:
-            # Fit Isolation Forest to the column
-            iso_forest = IsolationForest(contamination=0.05)  # Adjust contamination value (e.g., 0.05 for 5% anomalies)
-            anomaly_scores = iso_forest.fit_predict(self.df[[col]])
+    print(f"Monthly Cost: {output['monthlyCost']}")
     
-            # -1 indicates an anomaly, 1 indicates normal data
-            anomalies[col] = self.df[anomaly_scores == -1][col].tolist()
-
-        return {'anomalies': anomalies}
     
-    def clustering_analysis(self):
-        numeric_cols = self.df.select_dtypes(include=['int64', 'float64']).columns
-        X = self.df[numeric_cols]
+    return output['choices'][0]['message']['content']
 
-        scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(X)
-        
-        warnings.filterwarnings("ignore", message="n_jobs value 1 overridden to 1 by setting random_state")
-        umap_reducer = umap.UMAP(n_components=2, random_state=42)
-        X_umap = umap_reducer.fit_transform(X_scaled)
 
-        clusterer = hdbscan.HDBSCAN(min_cluster_size=5, gen_min_span_tree=True)
-        clusters = clusterer.fit_predict(X_scaled)
+def image_info(base64_image, prompt, api_key, model='gpt-4o-mini'):
+    
+    """Base64 encoding is a way to represent binary data (like an image) as a string using only ASCII characters.
+    This is useful for embedding images directly in text-based formats like HTML, CSS, or JSON"""
+    
+    url = 'https://aiproxy.sanand.workers.dev/openai/v1/chat/completions'
+    headers = {        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {api_key}'    }
+    data = {        'model': model,
+        'messages': [    {  'role': 'user',
+                'content': [   { 'type': 'text','text': prompt   },
+                    { 'type': 'image_url',
+                      'image_url': {
+                            'url': f'data:image/png;base64,{base64_image}',
+                            "detail": "low"  }    }  ] }   ]
+    }
 
-        return {
-            'umap_coordinates': X_umap.tolist(),
-            'cluster_labels': clusters.tolist(),
-            'n_clusters': len(set(clusters)) - (1 if -1 in clusters else 0)
-        }
+    response = requests.post(url, headers=headers, json=data)
+    output = response.json()
 
-from sklearn.base import BaseEstimator, TransformerMixin
-from scipy import stats
+    if output.get('error', None):
+        print('LLM Error:\n', output)
+        return None
+    
+    print(f"Monthly Cost: {output['monthlyCost']}")
+    
+    return output['choices'][0]['message']['content']
+
+
+
+# call each function with its name
+# AI Proxy 'Function Call' Functions
+def calling_chat_function(prompt, api_key, function_descriptions, model='gpt-4o-mini'):
+    url = 'https://aiproxy.sanand.workers.dev/openai/v1/chat/completions'
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {api_key}'
+    }
+    data = {
+        'model': model,
+        'messages': [
+            {
+                'role': 'user',
+                'content': prompt
+            }
+        ],
+        'functions': function_descriptions,
+        'function_call': 'auto'
+    }
+    response = requests.post(url, headers=headers, json=data)    
+    output = response.json()
+
+    if output.get('error', None):
+        print('LLM Error:\n', output)
+        return None
+    
+    print(f"Monthly Cost: {output['monthlyCost']}")
+    
+    return {
+        'arguments': output['choices'][0]['message']['function_call']['arguments'],
+        'name': output['choices'][0]['message']['function_call']['name']
+    }
+
+# set the function descriptions
+filter_function_descriptions = [
+    {
+        'name': 'filter_features',
+        'description': 'Generic function to extract data from a dataset.',
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "features": {"type": "array","items": {"type": "string"  },
+                    "description": "List of column names to keep. Eg. ['language', 'quality']",
+                },  },  "required": ["features"]    }    },
+    {
+        'name': 'extract_features_and_target',
+        'description': 'Extract a feature matrix and a target vector for training a regression model. Call this when you need to get X and y for a Regression or Classification task.',
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "features": {
+                    "type": "array",
+                    "items": {  "type": "string"     },
+                    "description": "List of column names to choose for the feature matrix. Eg. ['n_rooms', 'locality', 'latitude']",   },
+                "target": {  "type": "string",
+                    "description": "The column name of the target. Eg. 'price'",         },
+            },      "required": ["features", "target"]        }    },
+    {   'name': 'extract_time_series_data',
+        'description': "Extract the time column and numerical column for a time series analysis. Eg. 'date' and 'price'",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "date_column": {     "type": "string",
+                    "description": "The column name of the date column.",   },
+                "numerical_column": {
+                    "type": "string",
+                    "description": "The column name of the numerical column. Eg. 'price'",
+                }            },
+            "required": ["date_column", "numerical_column"]     }    },]
+
+
+def filter_features(data, features):
+    return data[features]
+
+def extract_features_and_target(data, features, target):
+    return data[features], data[target]
+
+def extract_time_series_data(data, date_column, numerical_column):
+    return data[[date_column, numerical_column]]
+
+# Analysis Functions
+def generic_analysis(data):
+    results = {
+        'first_5': data.head(),
+        'summary_stats': data.describe(),
+        'missing_values': data.isnull().sum(),
+        'column_data_types': data.dtypes,
+        'n_unique': data.nunique(),
+        'n_duplicates': data.duplicated().sum()
+    }
+
+    buffer = io.StringIO()
+    data.info(buf=buffer)
+    results['basic_info'] = buffer.getvalue()
+    buffer.close()
+
+    # Compute correlation matrix for numeric columns only
+    numeric_data = data.select_dtypes(include=['number'])
+    if numeric_data.empty:
+        print("\nNo numeric columns found. Cannot compute correlation matrix.")
+        results['corr'] = None
+    else:
+        results['corr'] = numeric_data.corr()
+
+    return results
+
+
+""" Non-generic Analysis Functions
+
+Non-generic analysis functions are typically specialized methods designed to perform a specific type of analysis on data.
+Like outlier detection,regression , time series analysis.
+scikit-learn (sklearn) is a widely used machine learning library in Python. It provides simple and efficient tools for data mining and data analysis
+"""
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import IsolationForest
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.cluster import KMeans
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import classification_report, confusion_matrix
 
+def outlier_detection(dataset_file, data, api_key):
+    # Outliers are data points that deviate significantly from the majority of the data in a dataset. 
+    df = data.select_dtypes(include=['number']) # select numeric values
 
-
-
-""" Make the API to genrative a narrative based on the analysis.
-Make a prompt first and using API KEYandAPI URL make the llm to visualize the data and generate a readme file"""
-class Data_Visualization:
-    def __init__(self, df):
-        self.df = df
-
-    def generate_narrative(self, analysis_results, foldername):
-        try:
-            api_token = os.environ['AIPROXY_TOKEN']
-            if not api_token:
-                raise ValueError("API token not found. Set the AIPROXY_TOKEN environment variable.")
-
-            prompt = f"""Generate a compelling data story based on the following analysis:
-Dataset Overview:- Columns: {', '.join(self.df.columns)}
-- Number of Rows: {len(self.df)}
-- Missing Values: {dict(self.df.isnull().sum())}
-Descriptive Statistics:
-{analysis_results['descriptive_analysis']}
-Key Insights:- Correlation Highlights: {analysis_results['correlation_analysis']}
-here modify and give me
-The data you received, briefly
-The analysis you carried out
-The insights you discovered
-The implications of your findings (i.e. what to do with the insights)
-Create a good readme file with proper formatting
-"""
-            payload = {
-                "model": "gpt-4o-mini",
-                "messages": [
-                    {"role": "system", "content": "You are a data storyteller. Explain complex data insights in a clear, engaging manner."},
-                    {"role": "user", "content": prompt}
-                ]
-            }
-
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {api_token}"
-            }
-
-            response = requests.post(API_URL, json=payload, headers=headers)
-
-            if response.status_code == 200:
-                result = response.json().get("choices", [{}])[0].get("message", {}).get("content", "No response content.")
-                with open(foldername + 'README.md','w') as file:
-                    file.write(result)
-                return result
-            else:
-                return f"Failed to generate narrative. HTTP Status: {response.status_code}, Response: {response.text}"
-        except Exception as e:
-            return f"Narrative generation failed: {str(e)}"
-
-    def visualize_insights(self, analysis_results, foldername):
-        plt.figure(figsize=(12, 10))
-        corr_matrix = pd.DataFrame(analysis_results['correlation_analysis']['correlation_matrix'])
-
-        mask = np.triu(np.ones_like(corr_matrix, dtype=bool))
-
-        sns.heatmap(corr_matrix,
-                    mask=mask,
-                    annot=True,
-                    cmap='coolwarm',
-                    center=0,
-                    square=True,
-                    linewidths=0.5,
-                    cbar_kws=None,
-                    annot_kws={"fontsize":8})
-
-        plt.title('Correlation Heatmap', fontsize=16, pad=20)
-        plt.tight_layout()
-        plt.savefig(foldername + 'correlation_heatmap.png', dpi=300, bbox_inches='tight')
-        plt.close()
-
-        # 2. Outlier Box Plot
-        plt.figure(figsize=(15, 8))
-        numeric_cols = self.df.select_dtypes(include=['int64', 'float64']).columns
-        box_plot = self.df[numeric_cols].boxplot(rot=90)
-
-        plt.title('Outlier Box Plot', fontsize=16, pad=20)
-        plt.xlabel('Columns', fontsize=12)
-        plt.ylabel('Values', fontsize=12)
-        plt.tight_layout()
-        plt.savefig(foldername + 'outlier_box_plot.png', dpi=300, bbox_inches='tight')
-        plt.close()
-
-        return {
-            'correlation_heatmap': 'correlation_heatmap.png',
-            'outlier_box_plot': 'outlier_box_plot.png'
-        }
+    if df.empty:
+        print("\nNo numeric columns found.")
+        return None
+    """pipeline refers to a streamlined, step-by-step process for transforming raw data into a model ready for predictions. """
     
-#main function
-def main(csv_path):
-    try:
-        data_loader = Csv_Load(csv_path)
-        data_loader.arrange_data()
-        print("Data Loaded Successfully")
+    preprocessing = Pipeline([
+        ('imputer', SimpleImputer(strategy='mean')),
+        ('scaler', StandardScaler()),
+    ])
+    isolation_forest = IsolationForest(contamination='auto', random_state=42)
+
+    df_tr = preprocessing.fit_transform(df)
+    isolation_forest.fit(df_tr)
+    """IsolationForest is an algorithm used for anomaly detection. It works by isolating observations (data points) in the dataset. The idea is that outliers or anomalies are easier to isolate than normal points because they are rare and different from the majority of the data."""
+    anomaly_score = isolation_forest.predict(df_tr)
+    return { 
+        'n_anomalies': (anomaly_score == -1).sum(), 
+        'n_samples': df_tr.shape[0]
+    }
 
 
-        foldername = csv_path.split(".csv")[0] + "/"
-        if not os.path.exists(foldername):
-            os.makedirs(foldername)
+def regression_analysis(dataset_file, data, api_key):
+    """ To find  relationship between independent variables (features) and a dependent variable (target) in a dataset."""
+    columns_info = "\n".join([f"{col}: {dtype}" for col, dtype in data.dtypes.items()])
+    prompt = f"""\
+    You are given a file {dataset_file}.
+
+    With features:
+    {columns_info}
+
+    Here is a sample:
+    {data.iloc[0, :]}
+
+    Extract the features and target for Regression task.
+    Note: Do not include column names that include the word 'id'.
+
+    Make sure to NOT include the target variable in the features list.
+    """
+    
+    response = calling_chat_function(prompt=prompt, api_key=api_key, function_descriptions=filter_function_descriptions)
+
+    print(response)
+    if not response:
+        return None
+
+    params = json.loads(response['arguments'])
+    chosen_func = eval(response['name'])
+    
+    if 'target' not in params.keys():
+        return None
+    
+    # print('Regression Analysis')
+    params['features'] = list(filter(lambda feature: feature != params['target'], params['features']))
+
+    
+    X, y = chosen_func(data=data, **params)
+    X = X.select_dtypes(include=['number'])
+
+    if X.empty:
+        print("\nNo numeric columns found.")
+        return None
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+    pipe = Pipeline([
+        ('imputer', SimpleImputer(strategy='mean')),
+        ('scaler', StandardScaler()),
+        ('regression', LinearRegression())
+    ])
+
+    pipe.fit(X_train, y_train)
+    y_pred = pipe.predict(X_test)
+
+    r2_score = pipe.score(X_test, y_test)
+    mae = mean_absolute_error(y_test, y_pred)
+    mse = mean_squared_error(y_test, y_pred)
+    rmse = mse ** 0.5
+
+    chart_name = plot_regression(y_test, y_pred)
+
+    return {
+        'r2_score': r2_score,
+        'mae': mae,
+        'mse': mse,
+        'rmse': rmse,
+        'coefficient': pipe['regression'].coef_,
+        'intercept': pipe['regression'].intercept_,
+        'feature_names_input': list(X.columns),
+        'target_name': y.name,
+        'chart': chart_name
+    }
 
 
-        analyzer = Data_Analyze(data_loader.df)
-        analysis_results = {
-            'descriptive_analysis': analyzer.descriptive_analysis(),
-            'correlation_analysis': analyzer.correlation_analysis(),
-            'outlier_detection': analyzer.outlier_detection(),
-            'anomalies': analyzer.anomaly_detection(),
-            'clustering_analysis': analyzer.clustering_analysis()
+def correlation_analysis(dataset_file, data, api_key):
+    # statistical method used to measure the strength and direction of the relationship between two variables.
+    
+    columns_info = "\n".join([f"{col}: {dtype}" for col, dtype in data.dtypes.items()])
+    prompt = f"""\
+    You are given a file {dataset_file}.
+
+    With features:
+    {columns_info}
+    Here is a sample:
+    {data.iloc[0, :]}
+    Extract only the most important features to perform a Correlation analysis.
+    Eg. 'height', 'weight', etc.
+    Note: Do not include column names that include the word 'id'.
+    Hint: Use function filter_features.    """
+    
+    response = calling_chat_function(prompt=prompt, api_key=api_key, function_descriptions=filter_function_descriptions)
+
+    # print(response)
+    if not response:
+        return None
+    
+    params = json.loads(response['arguments'])
+    chosen_func = eval(response['name'])
+    print(params)
+    df = chosen_func(data=data, **params)   # call chosen_func function
+    numeric_data = df.select_dtypes(include=['number'])   
+    if numeric_data.empty:
+        print("\nNo numeric columns found. Cannot compute correlation matrix.")
+        return None
+    
+    corr = numeric_data.corr()
+    chart_name = plot_correlation(corr)     # name the chart
+
+    return {
+        'correlation_matrix': corr,
+        'chart': chart_name
+    }
+
+
+def cluster_analysis(dataset_file, data, api_key):
+    """ to group similar data points into clusters, based on shared characteristics, to uncover patterns or structures within the data."""
+    columns_info = "\n".join([f"{col}: {dtype}" for col, dtype in data.dtypes.items()])
+    prompt = f"""\
+    You are given a file {dataset_file}.
+
+    With features:
+    {columns_info}
+    Here is a sample:
+    {data.iloc[0, :]}
+    Extract only the most important features to perform a Clustering analysis using K-Means.
+    Note: Do not include column names that include the word 'id'. 
+    Hint: Use function filter_features.    """
+    
+    response = calling_chat_function(prompt=prompt, api_key=api_key, function_descriptions=filter_function_descriptions)
+
+    # print(response)
+    if not response:
+        return None
+    
+    params = json.loads(response['arguments'])
+    chosen_func = eval(response['name'])
+    print("Param:" ,params)
+    df = chosen_func(data=data, **params)
+
+    # TODO: (Optional) Use LLM to separate numerical cols from categorical cols.
+    df = df.select_dtypes(include=['number'])
+    """ Work flow of the pipeline.
+    The imputer fills in missing values in the dataset.
+    The scaler standardizes the features to a common scale.
+    The KMeans algorithm then clusters the data into 4 groups based on the transformed features."""
+    
+    pipe = Pipeline([
+        ('imputer', SimpleImputer(strategy='mean')),    # Handles missing values in the dataset.
+        ('scaler', StandardScaler()),       #Standardizes or normalizes the data.
+        ('kmeans', KMeans(n_clusters=4, random_state=42))   #Performs K-Means clustering to group the data into 4 clusters.
+    ])
+
+    pipe.fit(df)
+    print("Cluster analysis done")
+    return {
+        'cluster_centers': pipe['kmeans'].cluster_centers_,
+        'inertia': pipe['kmeans'].inertia_,
+    }
+
+
+def classification_analysis(dataset_file, data, api_key):
+    
+    columns_info = "\n".join([f"{col}: {dtype}" for col, dtype in data.dtypes.items()])
+    prompt = f"""\
+    You are given a file {dataset_file}.
+    With features:
+    {columns_info}
+    Here is a sample:
+    {data.iloc[0, :]}
+    Extract the features and target for Classification task.
+    Note: Do not include column names that include the word 'id'.
+    Make sure to NOT include the target variable in the features list.
+    Note: The target column should be categorical datatype.    """
+
+    response = calling_chat_function(prompt=prompt, api_key=api_key, function_descriptions=filter_function_descriptions)
+    # extracts the parameters from the response and converts them into a dictionary (params).
+    print(response)
+    if not response:
+        return None
+    params = json.loads(response['arguments'])
+    select_func = eval(response['name'])
+    
+    if 'target' not in params.keys():
+        return None
+  
+    params['features'] = list(filter(lambda feature: feature != params['target'], params['features']))
+    #call the (select_func) is called with the dataset and the parameters, returning the features (X) and target (y).
+    X, y = select_func(data=data, **params)
+    X = X.select_dtypes(include=['number'])
+
+    if y.nunique() > 20:   # y values not unique
+        print('\n y is not a valid target label.')
+        return None
+
+    if X.empty:
+        print("\nNo numeric columns found.")
+        return None
+    # set axes values and test values
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+    pipe = Pipeline([
+        ('imputer', SimpleImputer(strategy='mean')),
+        ('scaler', StandardScaler()),
+        ('log_clf', LogisticRegression(random_state=42))
+    ])
+
+    pipe.fit(X_train, y_train)
+    y_pred = pipe.predict(X_test)
+
+    con_mat = confusion_matrix(y_test, y_pred)
+    report = classification_report(y_test, y_pred)
+
+    chart_name = plot_classification(y_test, y_pred)
+
+    return {
+        'confusion_matrix': con_mat,
+        'classification_report': report,
+        'chart': chart_name
+    }
+
+
+# TODO: Add analysis function.
+def geographic_analysis(dataset_file, data, api_key):
+    pass
+
+
+def time_series_analysis(dataset_file, data, api_key):
+    columns_info = "\n".join([f"{col}: {dtype}" for col, dtype in data.dtypes.items()])
+    prompt = f"""\
+    You are given a file {dataset_file}.
+
+    With features:
+    {columns_info}
+    Here is a sample:
+    {data.iloc[0, :]}
+    Extract the date column and the numerical column.
+    Note: Do not include column names that include the word 'id'. 
+    Hint: Use function extract_time_series_data.    """
+    
+    response = calling_chat_function(prompt=prompt, api_key=api_key, function_descriptions=filter_function_descriptions)
+
+    if not response:
+        return None
+    
+    params = json.loads(response['arguments'])
+    chosen_func = eval(response['name'])
+
+    df = chosen_func(data=data, **params)
+    date_col = params['date_column']
+    num_col = params['numerical_column']
+    df = df.copy()
+    df[date_col] = pd.to_datetime(df[date_col])
+    df = df.set_index(date_col).sort_index()
+
+    ts_data = df[num_col]
+
+    from statsmodels.tsa.stattools import adfuller
+    from statsmodels.tsa.seasonal import seasonal_decompose
+
+    result = adfuller(ts_data)
+
+    # decompose_result = seasonal_decompose(ts_data, model='additive')
+    # decompose_result.plot()
+    # plt.show()
+
+    chart_name = plot_time_series(ts_data, num_col)
+
+    return {
+        'adf_statistic': result[0],
+        'p_value': result[1],
+        'critical_values': result[4],
+        'is_stationary': result[1] <= 0.05,
+        'chart': chart_name
+    }
+
+
+# Plotting Functions
+def plot_time_series(ts_data, num_col):
+    dpi = 100
+    plt.figure(figsize=(512 / dpi, 512 / dpi), dpi=dpi)
+    
+    plt.plot(ts_data, label=num_col)
+    plt.title(f"Time Series of {num_col}")
+    plt.xlabel("Date")
+    plt.ylabel(num_col)
+    plt.legend()
+
+    chart_name = name_chart_file()
+    
+    plt.savefig(f"{chart_name}.png")
+    plt.show()
+    plt.close()
+
+    return f"{chart_name}.png"
+
+
+def plot_regression(y_true, y_pred):
+    dpi = 100
+    plt.figure(figsize=(512 / dpi, 512 / dpi), dpi=dpi)
+
+    plt.scatter(y_true, y_pred, alpha=0.8)
+    plt.plot(y_true, y_true, 'r-', label='y = x')
+    plt.xlabel('Actual')
+    plt.ylabel('Predicted')
+    plt.title('Actual vs Predicted')
+    plt.legend()
+
+    chart_name = name_chart_file()
+
+    plt.savefig(f"{chart_name}.png")
+    plt.show()
+    plt.close()
+
+    return f"{chart_name}.png"
+
+
+from sklearn.metrics import ConfusionMatrixDisplay
+
+def plot_classification(y_true, y_pred):
+    dpi = 100
+    plt.figure(figsize=(512 / dpi, 512 / dpi), dpi=dpi)
+
+    ConfusionMatrixDisplay.from_predictions(y_true, y_pred)
+    plt.grid(False)
+
+    chart_name = name_chart_file()
+
+    plt.savefig(f"{chart_name}.png")
+    plt.show()
+    plt.close()
+
+    return f"{chart_name}.png"
+
+
+def plot_correlation(corr):
+    dpi = 100
+    n_cols = len(corr.columns)
+    plt.figure(figsize=(n_cols, n_cols), dpi=dpi)
+    # plt.figure(figsize=(512 / dpi, 512 / dpi), dpi=dpi)
+
+    sns.heatmap(corr, annot=True, cmap='RdYlGn', fmt=".2f")
+    plt.title('Correlation Heatmap')
+
+    chart_name = name_chart_file()
+
+    plt.savefig(f"{chart_name}.png", dpi=dpi)
+    plt.show()
+    plt.close()
+
+    return f"{chart_name}.png"
+
+
+# Perform Analysis Functions
+def choose_analysis(dataset_file, data, api_key, analyses):
+    results = {}
+    for analysis in analyses:
+        func = eval(analysis)
+        res = func(dataset_file, data, api_key)
+        if res != None:
+            results[analysis] = res
+    
+    return results
+
+
+def meta_analyse(dataset_file, data, api_key):
+    analyses = ['outlier_detection', 'regression_analysis', 'correlation_analysis', 
+                'cluster_analysis', 'classification_analysis', 'geographic_analysis', 
+                'network_analysis', 'time_series_analysis']
+
+    analysis_function_descriptions = [
+        {
+            'name': 'choose_analysis',
+            'description': 'A function to choose all the relevant analysis to be performed for a dataset.',
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "analyses": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "List of analysis to perform in order. Eg. ['regression_analysis', 'time_series_analysis', 'outlier_detection']",
+                    },
+                },
+                "required": ["indices"]
+            }
         }
-        print("Descriptive Statistics Generated")
+    ]
+    columns_info = "\n".join([f"{col}: {dtype}" for col, dtype in data.dtypes.items()])
+    
+    unorder_list_analyses = "\n".join([f'{i+1}. {analysis_name}' for (i, analysis_name) in enumerate(analyses)])
+    
+    prompt = f"""\
+    You are given a file {dataset_file}.
+
+    With features:
+    {columns_info}
+
+    Here are a few samples:
+    {data.iloc[:3, :]}
+
+    Note: Perform only the appropriate analyses.
+
+    Analysis options:
+    {unorder_list_analyses}
+
+    Call the choose_analysis function with the correct options.
+    """
+
+    response = calling_chat_function(prompt=prompt, api_key=api_key, function_descriptions=analysis_function_descriptions)
+    # print(response)
+
+    params = json.loads(response['arguments'])
+    choose_analysis_func = eval(response['name'])
+
+    print(params)
+
+    analysis_results = choose_analysis_func(dataset_file, data, api_key, **params)
+    return analysis_results
 
 
-   
-        visualizer = Data_Visualization(data_loader.df)
-        analysis_results['visualization'] = visualizer.visualize_insights(analysis_results, foldername)
-        print("Data Visualization Chart generated")
+# LLM Prompt: Description Functions
+def describe_generic_analysis(results, dataset_file, data, api_key):
+    columns_info = "\n".join([f"{col}: {dtype}" for col, dtype in data.dtypes.items()])
 
-        analysis_results['narrative'] = visualizer.generate_narrative(analysis_results, foldername)
-        print("Narative Generation Completed")
+    prompt = f"""\
+    You are given a file: {dataset_file}
 
+    Features:
+    {columns_info}
+
+    Here are a few samples:
+    {results['first_5']}
+
+    Summary Statistics:
+    {results['summary_stats']}
+
+    Missing Values:
+    {results['missing_values']}
+
+    Number of unique values in each column:
+    {results['n_unique']}
+
+    Number of duplicated rows:
+    {results['n_duplicates']}
+
+    Correlation Analysis:
+    {results['corr']}
+
+    Give a short description about the given dataset. Also provide a brief description of the given statistical analysis. 
+    
+    Output in valid markdown format.
+    """
+
+    print(prompt)
+    response = chat(prompt=prompt, api_key=api_key)
+    return response
+
+
+def describe_meta_analysis(results, dataset_file, data, api_key):
+    responses = []
+    for (func, res) in results.items():
+        if not res:
+            continue
+        
+        prompt = f"""\
+        Analysis Function: {func}
+
+        Results:
+        {res}
+
+        The given analysis was performed on {dataset_file}.
+        What are some of the findings of this analysis?
+
+        * Write about the analysis that was performed.
+        * Try to infer insights from the results of the analysis.
+        * Provide a description about the insights you discovered.
+        * Give the implications of your findings.
+
+        Output in valid markdown format.
+        """
+    
+        img_path = res.get('chart', None)
+        print("\n Image path:", img_path)
+        if img_path:
+            chart_base64 = encode_image(img_path)
+            img_analysis_prompt = """\
+            Here is a chart to visualize some information in a .csv file. 
+            Analyze and infer insights from the chart, then summarize the findings.
+            """
+
+            image_analysis = image_info(chart_base64, prompt=img_analysis_prompt, api_key=api_key)
+
+            prompt += f"""
+            Additional: Add the chart image which is a .png file with its analysis to the markdown output.
+
+            Chart Analysis Summary:
+            {image_analysis}
+
+            Output in valid markdown format.
+            """
+        prompt = prompt.encode('ascii', 'ignore').decode('ascii')
+    
+
+        print(prompt)
+        response = chat(prompt=prompt, api_key=api_key)
+        responses.append(response)
+    
+    return responses
+
+import shutil
+
+def create_output_dir(dataset_file):
+    """Create an output directory based on the dataset filename."""
+    # Extract the dataset name without extension (e.g., 'goodreads' from 'goodreads.csv')
+    output_dir = os.path.splitext(dataset_file)[0]  # removes '.csv' from the filename
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    print("Output directory created")
+    return output_dir
+
+def write_file(file_name, content, output_dir):
+    """Write content to a file in the specified directory."""
+    output_path = os.path.join(output_dir, file_name)
+    with open(output_path, 'w') as file:
+        file.write(content)
+
+def save_chart(chart_name, output_dir):
+    """Save the chart PNG to the output directory."""
+    output_path = os.path.join(output_dir, chart_name)
+    shutil.copy(chart_name, output_path)  # copy the chart file to the output directory
+    print("Images saved")
+
+
+
+
+def main():
+    sns.set_theme('notebook')
+    api_key = load_env_key()
+    dataset_file = get_dataset()
+    encoding = get_dataset_encoding(dataset_file)
+
+    try:
+        df = pd.read_csv(dataset_file, encoding=encoding)
     except Exception as e:
-        print(f"Analysis failed: {e}")
+        print(f"Error reading the CSV file: {e}")
+        sys.exit(1)
 
-if __name__ == "__main__":
-    main(sys.argv[1])
+    df = df.dropna(axis=1, how='all').dropna(axis=0, how='all')
+    output_dir = create_output_dir(dataset_file)
+    # ANALYSIS
+    # Describe the given dataset.
+    generic_analysis_results = generic_analysis(data=df)
+    generated_desc = describe_generic_analysis(generic_analysis_results, dataset_file, df, api_key)
+    print("Generic analysis done")
+
+    
+    # Consult LLM and perform analysis.
+    meta_analysis_results = meta_analyse(dataset_file, df, api_key)
+    # print(meta_analysis_results)
+    generated_meta_analysis_descriptions = describe_meta_analysis(meta_analysis_results, dataset_file, df, api_key)
+
+    for meta_analysis_description in generated_meta_analysis_descriptions:
+        write_file('README.md', meta_analysis_description,output_dir)
+    print("Meta analysis done")    
+    # Save any charts (PNG files) that were generated during analysis
+    for analysis_result in meta_analysis_results.values():
+        chart_name = analysis_result.get('chart', None)
+        if chart_name:
+            save_chart(chart_name, output_dir)
+    print("Charts saved")
+if __name__ == '__main__':
+    main()

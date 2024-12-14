@@ -556,10 +556,6 @@ def classification_analysis(dataset_file, data, api_key):
     }
 
 
-# TODO: Add analysis function.
-def geographic_analysis(dataset_file, data, api_key):
-    pass
-
 
 def time_series_analysis(dataset_file, data, api_key):
     columns_info = "\n".join([f"{col}: {dtype}" for col, dtype in data.dtypes.items()])

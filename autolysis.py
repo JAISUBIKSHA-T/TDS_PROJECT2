@@ -577,9 +577,14 @@ def time_series_analysis(dataset_file, data, api_key):
     date_col = params['date_column']
     num_col = params['numerical_column']
     df = df.copy()
-    df[date_col] = pd.to_datetime(df[date_col])
-    df = df.set_index(date_col).sort_index()
-
+    try:
+        # Try parsing each column to datetime with a specified format
+        df[date_col] = pd.to_datetime(df[date_col], format='%Y-%m-%d', errors='raise')  # Modify format as needed
+    except (ValueError, TypeError):
+        # If it fails, it's not a date column, so we skip
+        pass
+    
+    
     ts_data = df[num_col]
 
     from statsmodels.tsa.stattools import adfuller
@@ -850,7 +855,7 @@ def create_output_dir(dataset_file):
 def write_file(file_name, content, output_dir):
     """Write content to a file in the specified directory."""
     output_path = os.path.join(output_dir, file_name)
-    with open(output_path, 'w') as file:
+    with open(output_path, 'w', encoding='utf-8') as file:
         file.write(content)
 
 def save_chart(chart_name, output_dir):

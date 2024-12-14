@@ -66,29 +66,20 @@ def get_dataset_encoding(dataset_file): # check whether the file is present or n
     return result.get('encoding', 'utf-8')
 
 
-
-
-
-def create_output_dir(dataset_file):
-    """Create an output directory based on the dataset filename."""
-    # Extract the dataset name without extension (e.g., 'goodreads' from 'goodreads.csv')
-    output_dir = os.path.splitext(dataset_file)[0]  # removes '.csv' from the filename
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-    print("Output directory created")
-    return output_dir
-def write_file(file_name,content):
-    """Write content to a file in the specified directory."""
-    
-    with open(file_name, 'w', encoding='utf-8') as file:
-        file.write(content)
+def write_file(file_name, text_content, title=None):
+    with open(file_name, "a") as f:
+        if title:
+            f.write("# " + title + "\n\n")
         
-import shutil
-def save_chart(chart_name, output_dir):
-    """Save the chart PNG to the output directory."""
-    output_path = os.path.join(output_dir, chart_name)
-    shutil.copy(chart_name, output_path)  # copy the chart file to the output directory
-    print("Images saved")
+        if text_content is not None and text_content.startswith("```markdown"):
+            text_content = text_content.replace("```markdown", "", 1).strip().rstrip("```").strip()
+
+        else:
+            print("text_content is None or does not start with the expected prefix.")
+
+
+        f.write(text_content)
+        f.write('\n\n')
 
 
 def encode_image(image_path):
@@ -133,11 +124,11 @@ def chat(prompt, api_key, model='gpt-4o-mini'):
         'Authorization': f'Bearer {api_key}'
     }
     data = {
-        'model': model,'temperature':0.7,
+        'model': model,
         'messages': [
             {
                 'role': 'system',
-                'content': 'You are a concise assistant and a data science expert. Provide brief and to-the-point answers in a creative way.'
+                'content': 'You are a concise assistant and a data science expert. Provide brief and to-the-point answers.'
             },
             {
                 'role': 'user',
@@ -345,13 +336,11 @@ def regression_analysis(dataset_file, data, api_key):
 
     With features:
     {columns_info}
-
     Here is a sample:
     {data.iloc[0, :]}
-
     Extract the features and target for Regression task.
     Note: Do not include column names that include the word 'id'.
-
+    Narrate in an interesting way.
     Make sure to NOT include the target variable in the features list.
     """
     
@@ -422,6 +411,7 @@ def correlation_analysis(dataset_file, data, api_key):
     {data.iloc[0, :]}
     Extract only the most important features to perform a Correlation analysis.
     Eg. 'height', 'weight', etc.
+    Narrate in an interesting way.
     Note: Do not include column names that include the word 'id'.
     Hint: Use function filter_features.    """
     
@@ -460,7 +450,8 @@ def cluster_analysis(dataset_file, data, api_key):
     Here is a sample:
     {data.iloc[0, :]}
     Extract only the most important features to perform a Clustering analysis using K-Means.
-    Note: Do not include column names that include the word 'id'. 
+    Note: Do not include column names that include the word 'id'.
+    Narrate in an interesting way.
     Hint: Use function filter_features.    """
     
     response = calling_chat_function(prompt=prompt, api_key=api_key, function_descriptions=filter_function_descriptions)
@@ -471,7 +462,7 @@ def cluster_analysis(dataset_file, data, api_key):
     
     params = json.loads(response['arguments'])
     chosen_func = eval(response['name'])
-    print(params)
+    print("Param:" ,params)
     df = chosen_func(data=data, **params)
 
     # TODO: (Optional) Use LLM to separate numerical cols from categorical cols.
@@ -488,7 +479,7 @@ def cluster_analysis(dataset_file, data, api_key):
     ])
 
     pipe.fit(df)
-
+    print("Cluster analysis done")
     return {
         'cluster_centers': pipe['kmeans'].cluster_centers_,
         'inertia': pipe['kmeans'].inertia_,
@@ -507,6 +498,7 @@ def classification_analysis(dataset_file, data, api_key):
     Extract the features and target for Classification task.
     Note: Do not include column names that include the word 'id'.
     Make sure to NOT include the target variable in the features list.
+    Narrate in an interesting way.
     Note: The target column should be categorical datatype.    """
 
     response = calling_chat_function(prompt=prompt, api_key=api_key, function_descriptions=filter_function_descriptions)
@@ -556,6 +548,10 @@ def classification_analysis(dataset_file, data, api_key):
     }
 
 
+# TODO: Add analysis function.
+def geographic_analysis(dataset_file, data, api_key):
+    pass
+
 
 def time_series_analysis(dataset_file, data, api_key):
     columns_info = "\n".join([f"{col}: {dtype}" for col, dtype in data.dtypes.items()])
@@ -567,9 +563,9 @@ def time_series_analysis(dataset_file, data, api_key):
     Here is a sample:
     {data.iloc[0, :]}
     Extract the date column and the numerical column.
-    Note: Do not include column names that include the word 'id'. 
-    Hint: Use function extract_time_series_data.
-    Give annalyse in an interesting way"""
+    Note: Do not include column names that include the word 'id'.
+    Narrate in an interesting way like a story teller.
+    Hint: Use function extract_time_series_data.    """
     
     response = calling_chat_function(prompt=prompt, api_key=api_key, function_descriptions=filter_function_descriptions)
 
@@ -582,10 +578,15 @@ def time_series_analysis(dataset_file, data, api_key):
     df = chosen_func(data=data, **params)
     date_col = params['date_column']
     num_col = params['numerical_column']
-
-    df[date_col] = pd.to_datetime(df[date_col])
-    df = df.set_index(date_col).sort_index()
-
+    df = df.copy()
+    try:
+        # Try parsing each column to datetime with a specified format
+        df[date_col] = pd.to_datetime(df[date_col], format='%Y-%m-%d', errors='raise')  # Modify format as needed
+    except (ValueError, TypeError):
+        # If it fails, it's not a date column, so we skip
+        pass
+    
+    
     ts_data = df[num_col]
 
     from statsmodels.tsa.stattools import adfuller
@@ -726,7 +727,7 @@ def meta_analyse(dataset_file, data, api_key):
     
     prompt = f"""\
     You are given a file {dataset_file}.
-
+    As a creative story teller narrate the analysis.
     With features:
     {columns_info}
 
@@ -736,7 +737,7 @@ def meta_analyse(dataset_file, data, api_key):
     Note: Perform only the appropriate analyses.
 
     Analysis options:
-    {unorder_list_analyses}
+       {unorder_list_analyses}
 
     Call the choose_analysis function with the correct options.
     """
@@ -759,7 +760,7 @@ def describe_generic_analysis(results, dataset_file, data, api_key):
 
     prompt = f"""\
     You are given a file: {dataset_file}
-    As a creativ story teller give insights from the following.
+
     Features:
     {columns_info}
 
@@ -781,9 +782,9 @@ def describe_generic_analysis(results, dataset_file, data, api_key):
     Correlation Analysis:
     {results['corr']}
 
-    Give a short description about the given dataset in an interesting way. Also provide a brief description of the given statistical analysis. 
+    Give a short description about the given dataset. Also provide a brief description of the given statistical analysis. 
     
-    Output must be in valid markdown format.
+    Output in valid markdown format.
     """
 
     print(prompt)
@@ -802,7 +803,7 @@ def describe_meta_analysis(results, dataset_file, data, api_key):
 
         Results:
         {res}
-    
+
         The given analysis was performed on {dataset_file}.
         What are some of the findings of this analysis?
 
@@ -810,12 +811,12 @@ def describe_meta_analysis(results, dataset_file, data, api_key):
         * Try to infer insights from the results of the analysis.
         * Provide a description about the insights you discovered.
         * Give the implications of your findings.
-        Give narrative in an intersting and creative manner.
-        Make the reader curious about to read.
+        Make the analysis in an efficient way.
         Output in valid markdown format.
         """
     
         img_path = res.get('chart', None)
+        print("\n Image path:", img_path)
         if img_path:
             chart_base64 = encode_image(img_path)
             img_analysis_prompt = """\
@@ -827,17 +828,45 @@ def describe_meta_analysis(results, dataset_file, data, api_key):
 
             prompt += f"""
             Additional: Add the chart image which is a .png file with its analysis to the markdown output.
+
             Chart Analysis Summary:
             {image_analysis}
-
+            Make the analysis in an efficient way like a creativestory teller.
             Output in valid markdown format.
             """
+        prompt = prompt.encode('ascii', 'ignore').decode('ascii')
+    
 
         print(prompt)
         response = chat(prompt=prompt, api_key=api_key)
         responses.append(response)
     
     return responses
+
+import shutil
+
+def create_output_dir(dataset_file):
+    """Create an output directory based on the dataset filename."""
+    # Extract the dataset name without extension (e.g., 'goodreads' from 'goodreads.csv')
+    output_dir = os.path.splitext(dataset_file)[0]  # removes '.csv' from the filename
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    print("Output directory created")
+    return output_dir
+
+def write_file(file_name, content):
+    """Write content to a file in the specified directory."""
+    
+    with open(file_name, 'w', encoding='utf-8') as file:
+        file.write(content)
+
+def save_chart(chart_name, output_dir):
+    """Save the chart PNG to the output directory."""
+    output_path = os.path.join(output_dir, chart_name)
+    shutil.copy(chart_name, output_path)  # copy the chart file to the output directory
+    print("Images saved")
+
+
 
 
 def main():
@@ -858,21 +887,22 @@ def main():
     # Describe the given dataset.
     generic_analysis_results = generic_analysis(data=df)
     generated_desc = describe_generic_analysis(generic_analysis_results, dataset_file, df, api_key)
+    print("Generic analysis done")
     write_file('README.md', generated_desc)
-
+        
     # Consult LLM and perform analysis.
     meta_analysis_results = meta_analyse(dataset_file, df, api_key)
     # print(meta_analysis_results)
+    generated_meta_analysis_descriptions = describe_meta_analysis(meta_analysis_results, dataset_file, df, api_key)
+
+    for meta_analysis_description in generated_meta_analysis_descriptions:
+        write_file('README.md', meta_analysis_description)
+    print("Meta analysis done")    
+    # Save any charts (PNG files) that were generated during analysis
     for analysis_result in meta_analysis_results.values():
         chart_name = analysis_result.get('chart', None)
         if chart_name:
             save_chart(chart_name, output_dir)
     print("Charts saved")
-    generated_meta_analysis_descriptions = describe_meta_analysis(meta_analysis_results, dataset_file, df, api_key)
-
-    for meta_analysis_description in generated_meta_analysis_descriptions:
-        write_file('README.md', meta_analysis_description)
-
-
 if __name__ == '__main__':
     main()

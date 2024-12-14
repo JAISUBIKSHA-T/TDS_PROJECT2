@@ -894,7 +894,7 @@ def main():
     generated_meta_analysis_descriptions = describe_meta_analysis(meta_analysis_results, dataset_file, df, api_key)
 
     for meta_analysis_description in generated_meta_analysis_descriptions:
-        write_file('README.md', meta_analysis_description,output_dir)
+        write_file('README.md', meta_analysis_description)
     print("Meta analysis done")    
     # Save any charts (PNG files) that were generated during analysis
     for analysis_result in meta_analysis_results.values():

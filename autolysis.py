@@ -852,11 +852,11 @@ def create_output_dir(dataset_file):
     print("Output directory created")
     return output_dir
 
-def write_file(file_name, content, output_dir):
+'''def write_file(file_name, content, output_dir):
     """Write content to a file in the specified directory."""
     output_path = os.path.join(output_dir, file_name)
     with open(output_path, 'w', encoding='utf-8') as file:
-        file.write(content)
+        file.write(content)'''
 
 def save_chart(chart_name, output_dir):
     """Save the chart PNG to the output directory."""
@@ -886,8 +886,8 @@ def main():
     generic_analysis_results = generic_analysis(data=df)
     generated_desc = describe_generic_analysis(generic_analysis_results, dataset_file, df, api_key)
     print("Generic analysis done")
-
-    
+    write_file('README.md', generated_desc)
+        
     # Consult LLM and perform analysis.
     meta_analysis_results = meta_analyse(dataset_file, df, api_key)
     # print(meta_analysis_results)

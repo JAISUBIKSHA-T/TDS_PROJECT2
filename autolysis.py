@@ -80,7 +80,7 @@ def create_output_dir(dataset_file):
 def write_file(file_name,content):
     """Write content to a file in the specified directory."""
     
-    with open(filename, 'w', encoding='utf-8') as file:
+    with open(file_name, 'w', encoding='utf-8') as file:
         file.write(content)
         
 import shutil

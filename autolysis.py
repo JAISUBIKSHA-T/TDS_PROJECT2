@@ -79,7 +79,7 @@ def create_output_dir(dataset_file):
     return output_dir
 def write_file(file_name,content):
     """Write content to a file in the specified directory."""
-    output_path = os.path.join(output_dir, file_name)
+    
     with open(filename, 'w', encoding='utf-8') as file:
         file.write(content)
         

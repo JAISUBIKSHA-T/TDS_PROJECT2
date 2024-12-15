@@ -236,8 +236,9 @@ def agentic_workflow(data_summary, feature_types):
     else:
         return initial_insights
 
-def create_visualizations(df, output_folder):
-    numeric_df = preprocess_data(df)
+def generate_visualizations(df, output_folder):
+    print("Generating visualizations")
+    numeric_df = preprocessing_data(df)
     visualization_df = preprocess_for_visualization(numeric_df)
 
     if numeric_df.shape[1] > 1:
@@ -253,7 +254,7 @@ def create_visualizations(df, output_folder):
         model = IsolationForest(random_state=42)
         visualization_df['outlier_score'] = model.fit_predict(visualization_df)
         plt.figure(figsize=(8, 6))
-        sns.scatterplot(data=visualization_df, x=visualization_df.columns[0], y=visualization_df.columns[1], hue='outlier_score', palette="Set1")
+        sns.scatterplot(data=visualization_df, x=visualization_df.columns[0], y=visualization_df.columns[1], hue='outlier_score', palette="coolwarm")
         plt.title("Outlier Detection (Scatter Plot)", fontsize=16)
         plt.xlabel(visualization_df.columns[0])
         plt.ylabel(visualization_df.columns[1])
@@ -273,7 +274,6 @@ def create_visualizations(df, output_folder):
         os.path.join(output_folder, "pairplot_analysis.png")
     ]
 
-
 def image_to_base64(image_path):
     """ Images are converted into base 64. Base64 encoding is used for encoding binary data (such as images, files, or other non-text data) into a text format.
     This encoding is useful in situations where binary data needs to be safely transmitted or stored in environments that primarily handle text."""
@@ -291,7 +291,7 @@ def analyze_image_with_vision_api(image_path, model="gpt-4o-mini"):
     }
     payload = {
     "model": model,
-    "messages": [{"role": "user", "content": "Analyze these images in an interesting manner."}],
+    "messages": [{"role": "user", "content": "Analyze this image."}],
     "image": image_to_base64(image_path),
     }
     response = requests.post(API_URL, headers=headers, json=payload)
@@ -307,7 +307,6 @@ def llm_narrate_story(summary, insights, advanced_analyses, charts, special_anal
         f"{key.capitalize()} Findings:\n{value}" for key, value in advanced_analyses.items()
     )
     prompt = (
-        "As a creative story teller generate a cohesive and structured narrative story."
         f"The dataset has the following properties:\n{summary}\n"
         f"Insights:\n{insights}\n"
         f"Advanced Analysis:\n{advanced_analyses_summary}\n"
@@ -316,7 +315,6 @@ def llm_narrate_story(summary, insights, advanced_analyses, charts, special_anal
         "Please generate a well-structured Markdown report covering data properties, analysis, insights, visualizations, and implications. "
         "Ensure that the content flows logically and highlights key findings with proper emphasis. "
         "Use headings, bullet points, and descriptions to enhance readability."
-        
     )
     return query_chat_completion(prompt)
 

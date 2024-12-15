@@ -307,7 +307,7 @@ def llm_narrate_story(summary, insights, advanced_analyses, charts, special_anal
         f"{key.capitalize()} Findings:\n{value}" for key, value in advanced_analyses.items()
     )
     prompt = (
-        "As a creative story teller generate a cohesive and structured narrative story.
+        "As a creative story teller generate a cohesive and structured narrative story."
         f"The dataset has the following properties:\n{summary}\n"
         f"Insights:\n{insights}\n"
         f"Advanced Analysis:\n{advanced_analyses_summary}\n"
@@ -316,6 +316,7 @@ def llm_narrate_story(summary, insights, advanced_analyses, charts, special_anal
         "Please generate a well-structured Markdown report covering data properties, analysis, insights, visualizations, and implications. "
         "Ensure that the content flows logically and highlights key findings with proper emphasis. "
         "Use headings, bullet points, and descriptions to enhance readability."
+        
     )
     return query_chat_completion(prompt)
 

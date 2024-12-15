@@ -1,25 +1,107 @@
-### The Tapestry of Happiness: Unraveling Patterns in Global Well-Being
+# Data Analysis Report
 
-In a world intertwined with numbers and narratives, the quest for happiness has become a profound expedition. As researchers poured over a vast dataset comprising 2,363 entries spanning various countries and years, they unearthed a mosaic of human emotions, economic realities, and social support systems. This analysis not only sought to quantify happiness but also to reveal the intricate connections that bind these elements together.
+## Introduction
+This report provides a comprehensive analysis of the dataset consisting of various metrics related to happiness, economic factors, and well-being across different countries over the years. The aim is to explore the properties of the data, conduct statistical analyses, identify key insights, and present visualizations to support our findings.
 
-#### The Correlation Matrix: Threads of Connection
+## Dataset Properties
 
-The journey began with the correlation matrix—a vibrant tapestry that illustrated the relationships among various dimensions of well-being. Here, the researchers discovered that **Life Ladder scores**, a measure of perceived life satisfaction, were positively correlated with **Log GDP per capita**, indicating that wealthier nations often boasted higher happiness levels. However, the matrix also unveiled unexpected ties; the **Social Support** dimension showed a strong relationship with both **Healthy Life Expectancy** and **Freedom to Make Life Choices**. It was evident that social connections and personal freedoms were equally critical to the human experience, suggesting that happiness is not solely about material wealth but also about the richness of relationships and individual autonomy.
+### Overview
+- **Shape**: The dataset comprises **2363 rows** and **11 columns**.
+- **Column Names**: The variables included are:
+  - Country name
+  - Year
+  - Life Ladder
+  - Log GDP per capita
+  - Social support
+  - Healthy life expectancy at birth
+  - Freedom to make life choices
+  - Generosity
+  - Perceptions of corruption
+  - Positive affect
+  - Negative affect
 
-#### DBSCAN Clusters: Finding Patterns in the Noise
+### Data Types
+- **Categorical**:
+  - Country name: Object (string)
+- **Numerical**:
+  - Year: Integer
+  - Life Ladder: Float
+  - Log GDP per capita: Float
+  - Social support: Float
+  - Healthy life expectancy at birth: Float
+  - Freedom to make life choices: Float
+  - Generosity: Float
+  - Perceptions of corruption: Float
+  - Positive affect: Float
+  - Negative affect: Float
 
-Next, the researchers applied the DBSCAN clustering algorithm, a tool designed to sift through the noise and identify meaningful patterns. They unearthed several distinct clusters, each representing unique combinations of happiness factors. One cluster comprised countries with high GDP per capita, high social support, and low perceptions of corruption—these nations stood out as beacons of happiness. Conversely, another cluster revealed nations struggling with low life satisfaction, marked by lower GDP and high negative affect scores. 
+### Missing Values
+The dataset has missing values across several columns:
+- Log GDP per capita: 28 missing
+- Social support: 13 missing
+- Healthy life expectancy at birth: 63 missing
+- Freedom to make life choices: 36 missing
+- Generosity: 81 missing
+- Perceptions of corruption: 125 missing
+- Positive affect: 24 missing
+- Negative affect: 16 missing
 
-Among the clusters, Argentina emerged as a noteworthy outlier, frequently appearing with a happiness score of 18. Its citizens, despite facing economic challenges, exhibited a remarkable resilience, demonstrating that culture, community, and a zest for life played pivotal roles in their happiness narrative.
+### Summary Statistics
+- **Mean** Life Ladder: 5.48
+- **Mean** Log GDP per capita: 9.40
+- **Mean** Healthy life expectancy: 63.40
+- **Mean** Freedom to make life choices: 0.75
+- **Mean** Positive affect: 0.65
+- **Mean** Negative affect: 0.27
 
-#### Hierarchical Clustering: The Family Tree of Well-Being
+## Data Cleaning and Preparation
+Before proceeding with the analysis, we handled the missing values using appropriate imputation strategies based on the nature of the data, ensuring robustness in our findings.
 
-The narrative continued to unfold through hierarchical clustering, which painted a family tree of happiness. This method revealed how countries grouped based on shared characteristics. Some nations, like those in Northern Europe, clustered together, characterized by high life satisfaction and robust social support systems. Meanwhile, countries from different continents formed their own clusters, revealing regional trends in happiness that transcended economic indicators.
+## Data Visualization
+Several visualizations were generated to facilitate a better understanding of the data properties.
 
-In this analysis, the researchers observed that **Perceptions of Corruption** acted as a significant divider among nations. Countries with low corruption perceptions clustered together, suggesting a direct link between trust in government and personal happiness. The narrative that emerged was a powerful reminder that integrity and transparency are the bedrocks of societal well-being.
+### Correlation Heatmap
+![Correlation Heatmap](happiness/correlation_heatmap.png)
+- **Significant Correlations**:
+  - Log GDP per capita and Healthy life expectancy at birth: **0.81**
+  - Life Ladder and Log GDP per capita: **0.77**
+  - Social support and Life Ladder: **0.72**
+  - Healthy life expectancy at birth and Life Ladder: **0.71**
 
-#### The Final Stitch in the Tapestry
+### Outlier Detection
+![Outlier Detection](happiness/outlier_detection.png)
+- Outlier analysis revealed several anomalies across key socioeconomic variables, warranting further exploration.
 
-As the researchers pieced together the findings, they uncovered a rich narrative woven from data and human experience. The analysis illustrated that happiness is a multifaceted concept, influenced by economic factors, social connections, and individual freedoms. The outliers, clusters, and correlations formed a comprehensive picture of global well-being, revealing that while wealth can contribute to happiness, it is the connections we forge and the freedoms we cherish that ultimately elevate our spirits.
+### Pair Plot Analysis
+![Pair Plot](happiness/pairplot_analysis.png)
+- Pair plots illustrated relationships between all pairs of numeric variables, providing insights into multivariate interactions.
 
-In the end, the dataset was not merely a collection of numbers and statistics; it was a testament to the resilience of the human spirit, a reminder that in the search for happiness, we are all interconnected, each thread of our lives contributing to the larger tapestry of human experience.
+## Advanced Analysis
+
+### Significant Correlations
+The following pairs demonstrated strong relationships:
+- **Log GDP per capita** is positively correlated with both **Healthy life expectancy at birth** and **Life Ladder**, suggesting that economic factors significantly influence overall happiness and health.
+  
+### Clustering Analysis
+Using K-means clustering, three distinct groups were identified:
+- **Cluster 0**: 908 observations
+- **Cluster 1**: 602 observations
+- **Cluster 2**: 853 observations
+This analysis can help in identifying countries with similar profiles in terms of happiness and socioeconomic metrics.
+
+### Geographical and Time-Series Analysis
+No geographical or time-series features were detected in the dataset.
+
+## Insights and Implications
+
+### Key Findings
+- Strong positive correlations exist between economic stability (Log GDP per capita) and measures of well-being (Life Ladder and Healthy life expectancy).
+- The analysis suggests that improving economic conditions and social support could enhance overall happiness in various countries.
+- Clustering indicates potential groupings of countries that could inform targeted policy interventions.
+
+### Recommendations
+- **Policy Initiatives**: Invest in strengthening economic factors and enhancing social support systems to improve national happiness levels.
+- **Further Research**: Explore the factors leading to noteworthy clusters to understand unique characteristics or needs of specific groups of countries.
+
+## Conclusion
+This analysis serves as a foundational exploration of the relationships present in the dataset regarding happiness and its determinants. The insights provided can guide policymakers and researchers in making data-informed decisions to promote well-being across nations.

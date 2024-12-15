@@ -1,29 +1,99 @@
-### Title: **The Library of Echoes**
+# Data Analysis Report
 
-In the heart of a bustling city, nestled between skyscrapers and coffee shops, stood an old, forgotten library. Its once-vibrant façade had faded into a muted gray, yet inside, the air was thick with the scent of aged paper and the whispers of countless stories. This library was home to 10,000 books, each with its own tale, but they were more than mere words on pages; they were echoes of lives lived and dreams dreamt.
+## 1. Introduction
+This report provides a comprehensive analysis of a dataset containing information about books from Goodreads. The dataset includes properties related to book ratings, authors, publication years, and more. The analysis highlights key insights derived from descriptive statistics, correlations, visualizations, and cluster analysis.
 
-#### The Whispering Books
+## 2. Dataset Properties
+### 2.1. Overview
+- **Shape**: (10000, 23)
+- **Columns**: 
+  - `book_id`, `goodreads_book_id`, `best_book_id`, `work_id`
+  - `books_count`, `isbn`, `isbn13`, `authors`
+  - `original_publication_year`, `original_title`, `title`, `language_code`
+  - `average_rating`, `ratings_count`, `work_ratings_count`, `work_text_reviews_count`
+  - `ratings_1`, `ratings_2`, `ratings_3`, `ratings_4`, `ratings_5`
+  - `image_url`, `small_image_url`
 
-One rainy afternoon, a curious data analyst named Mira stumbled upon this hidden gem. Intrigued, she began to sift through the library’s extensive collection. Each book had a unique identifier, a Goodreads book ID, and a best book ID, creating a tapestry of connections that spanned genres and eras. As she cataloged the books, she noticed patterns emerging—a correlation matrix that hinted at the relationships between authors, publication years, and average ratings.
+### 2.2. Data Types
+- Numerical: `int64`, `float64`
+- Categorical: `object` (string)
 
-The correlation matrix revealed that Stephen King, the library's most frequent author with 60 titles, was not just a prolific writer but a master at weaving suspense and horror, resonating deeply with readers. The average rating of the books hovered around 4.00, indicating that while many were beloved, others remained hidden gems, waiting for the right reader to discover them.
+### 2.3. Missing Values
+- Key columns with missing values:
+  - `isbn`: 700 missing
+  - `isbn13`: 585 missing
+  - `original_publication_year`: 21 missing
+  - `original_title`: 585 missing
+  - `language_code`: 1084 missing
 
-#### The Clusters of Stories
+## 3. Descriptive Statistics
+### Overview of Key Numerical Columns
+- Average Rating: Mean = 4.00, Std Dev = 0.25
+- Ratings Count: Mean = 54,001, Std Dev = 157,370
+- Work Ratings Count: Mean = 59,687, Std Dev = 167,804
 
-Mira decided to visualize her findings through clustering techniques. She employed the DBSCAN algorithm to identify groups of books that shared common traits. The clustering revealed fascinating insights: certain books, adorned with high ratings and numerous reviews, formed a tight-knit cluster, while others, despite their lower ratings, drew in readers with their unique narratives. 
+### Categorical Variables
+- Most frequent author: Stephen King (60 books)
+- Most common language code: `eng` (6,341 occurrences)
 
-One book, an old anthology of poetry, stood out as an outlier. With a Goodreads ID that had been associated with over 400,000 ratings, it almost seemed to whisper to Mira, begging her to delve into its verses. The DBSCAN clusters showcased the diversity of the library's offerings, highlighting how each book, regardless of its popularity, contributed to the overall literary landscape.
+## 4. Data Visualization
+### 4.1 Histograms
+![Histogram](goodreads/correlation_heatmap.png)
+- Showed distributions of ratings revealing right skewness for ratings count.
 
-#### The Tapestry of Connections
+### 4.2 Boxplots
+![Boxplot](goodreads/outlier_detection.png)
+- Identified significant outliers in ratings categories (e.g., `ratings_5`).
 
-Intrigued by the clusters, Mira turned her attention to hierarchical clustering. Using the similarities between the books, she created a dendrogram that illustrated the relationships among them. The branches revealed connections between genres and themes, showing how a psychological thriller could lead to a romance novel, or how a historical biography could resonate with a contemporary fiction piece.
+### 4.3 Pair Plots
+![Pairplot](goodreads/pairplot_analysis.png)
+- Established relationships among numerical features, indicating positive correlations between ratings categories.
 
-As she traced the branches of the dendrogram, Mira stumbled upon a surprising connection: a collection of essays published in the 1980s shared thematic similarities with a modern novel exploring identity and belonging. This realization lit a spark in her heart—each book was not an isolated entity but part of a grand narrative, echoing across time.
+## 5. Correlation Analysis
+### 5.1 Correlation Matrix
+- High positive correlations were found between:
+  - `ratings_count` and `work_ratings_count` (0.995)
+  - `ratings_5` and `work_ratings_count` (0.967)
 
-#### A Library Reborn
+### 5.2 Insights from Correlations
+- Strong correlation indicates that as the count of ratings increases, so does the count of work ratings and the average ratings in the dataset.
 
-Mira decided to share her findings with the world. She envisioned a digital platform that would breathe new life into the library. Readers could explore the clusters of stories and engage with the echoes of the past. They could discover lesser-known titles through recommendations based on the correlation matrix or connect with fellow bibliophiles over shared tastes.
+## 6. Anomaly Detection
+### 6.1 Outlier Analysis
+- Boxplots revealed numerous outliers, primarily in the ratings categories, indicating books receiving an unusually high or low number of ratings.
 
-As the sun set over the city, casting a warm glow on the library’s weathered walls, Mira realized that the true magic of this place lay not just in its books but in the connections they fostered. Each title was a thread in the tapestry of human experience, waiting to be unraveled and woven into new stories.
+### 6.2 Implications
+- Outliers may skew average ratings and require further investigation to determine if they signify errors or legitimate cases.
 
-With her heart full of hope and determination, Mira stepped out of the library, ready to transform the forgotten sanctuary into a vibrant community of readers and storytellers. The Library of Echoes was reborn, a place where stories converged, and the voices of the past resonated with the dreams of the future.
+## 7. Clustering Analysis
+### 7.1 K-Means Clustering
+- Clusters Identified:
+  - Cluster 0: 9967 entries
+  - Cluster 1: 24 entries
+  - Cluster 2: 9 entries
+
+### 7.2 Insights from Clustering
+- Majority of books fell into a single cluster, suggesting a general characteristic across most entries. The small clusters may represent niche books with specific attributes.
+
+## 8. Special Analyses
+### 8.1 Time-series Analysis
+- No time-series features identified in the dataset.
+
+### 8.2 Geographic Analysis
+- No geographic features detected.
+
+### 8.3 Network Analysis
+- No network features evaluated.
+
+## 9. Conclusion
+The analysis of the Goodreads dataset provided valuable insights into book ratings and author popularity. Key findings included:
+- Strong positive correlations between ratings variables indicate multiple ratings categories can significantly affect each other.
+- Outlier detection illuminated potential data quality issues in ratings.
+- Clustering suggests distinct groups among books, highlighting the potential for targeted recommendations.
+
+## 10. Implications for Further Research
+- Investigating missing values could enhance dataset quality and improve predictive analyses.
+- Exploring the relationships between authors and ratings might expose trends in favorable author characteristics. 
+- Future studies could also delve into temporal trends in book ratings if appropriate time-based data becomes available.
+
+This structured approach to analyzing the Goodreads dataset lays a foundation for deeper explorative and predictive analyses, giving stakeholders a broad view of the trends and anomalies present within the data.

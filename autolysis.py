@@ -236,20 +236,31 @@ def agentic_workflow(data_summary, feature_types):
     else:
         return initial_insights
 
+
 def generate_visualizations(df, output_folder):
     print("Generating visualizations")
+    
+    # Ensure output folder exists
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+
+    # Preprocessing
     numeric_df = preprocessing_data(df)
     visualization_df = preprocess_for_visualization(numeric_df)
 
+    # Check if numeric_df has more than 1 column
     if numeric_df.shape[1] > 1:
         plt.figure(figsize=(10, 8))
         sns.heatmap(numeric_df.corr(), annot=True, cmap="coolwarm", cbar_kws={'shrink': 0.8})
         plt.title("Correlation Heatmap", fontsize=16)
         plt.xlabel("Features")
         plt.ylabel("Features")
-        plt.savefig(os.path.join(output_folder, "correlation_heatmap.png"))
+        correlation_path = os.path.join(output_folder, "correlation_heatmap.png")
+        plt.savefig(correlation_path)
         plt.close()
+        print(f"Saved correlation heatmap to {correlation_path}")
 
+    # Check if visualization_df has more than 1 column
     if visualization_df.shape[1] > 1:
         model = IsolationForest(random_state=42)
         visualization_df['outlier_score'] = model.fit_predict(visualization_df)
@@ -258,22 +269,30 @@ def generate_visualizations(df, output_folder):
         plt.title("Outlier Detection (Scatter Plot)", fontsize=16)
         plt.xlabel(visualization_df.columns[0])
         plt.ylabel(visualization_df.columns[1])
-        plt.legend(title="Outliers")
-        plt.savefig(os.path.join(output_folder, "outlier_detection.png"))
+        outlier_path = os.path.join(output_folder, "outlier_detection.png")
+        plt.savefig(outlier_path)
         plt.close()
+        print(f"Saved outlier detection to {outlier_path}")
 
+    # Ensure at least 2 columns for pairplot
     if visualization_df.shape[1] > 1:
-        selected_columns = visualization_df.columns[:5]
-        sns.pairplot(visualization_df[selected_columns], palette="husl")
-        plt.savefig(os.path.join(output_folder, "pairplot_analysis.png"))
+        selected_columns = visualization_df.columns[:min(5, len(visualization_df.columns))]
+        pairplot_path = os.path.join(output_folder, "pairplot_analysis.png")
+        sns.pairplot(visualization_df[selected_columns], palette="coolwarm")
+        plt.savefig(pairplot_path)
         plt.close()
+        print(f"Saved pairplot to {pairplot_path}")
 
     return [
-        os.path.join(output_folder, "correlation_heatmap.png"),
-        os.path.join(output_folder, "outlier_detection.png"),
-        os.path.join(output_folder, "pairplot_analysis.png")
+        correlation_path,
+        outlier_path,
+        pairplot_path
     ]
+    
 
+  
+       
+       
 def image_to_base64(image_path):
     """ Images are converted into base 64. Base64 encoding is used for encoding binary data (such as images, files, or other non-text data) into a text format.
     This encoding is useful in situations where binary data needs to be safely transmitted or stored in environments that primarily handle text."""
@@ -291,17 +310,18 @@ def analyze_image_with_vision_api(image_path, model="gpt-4o-mini"):
     }
     payload = {
     "model": model,
-    "messages": [{"role": "user", "content": "Analyze this image."}],
+    "messages": [{"role": "user", "content": "Analyze this image in an interesting way as a creative story teller."}],
     "image": image_to_base64(image_path),
+    "temperature":0.7
     }
     response = requests.post(API_URL, headers=headers, json=payload)
 
-def llm_narrate_story(summary, insights, advanced_analyses, charts, special_analyses):
+def llm_narrate_story(summary, insights, advanced_analyses, charts, specific_analyses):
     """Generate a cohesive and structured narrative story."""
     print("Narrating summary")
     special_analyses_summary = "\n".join(
         f"{key.capitalize()} Analysis:\n" + "\n".join(value)
-        for key, value in special_analyses.items()
+        for key, value in specific_analyses.items()
     )
     advanced_analyses_summary = "\n".join(
         f"{key.capitalize()} Findings:\n{value}" for key, value in advanced_analyses.items()
